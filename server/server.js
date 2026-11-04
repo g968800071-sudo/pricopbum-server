@@ -59,6 +59,7 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
+  if (u.pathname === '/privacy' || u.pathname === '/privacy/') { try { const b = fs.readFileSync(path.join(WWW, 'privacy.html')); res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(b); } catch (e) { res.writeHead(404); return res.end('not found'); } }
   if (u.pathname === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('PRICOPBUM server OK'); }
   if (u.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, players: clients.size, rooms: rooms.size, privateRooms: codes.size, stepMs: +stepStat.avg.toFixed(3), stepMaxMs: +stepStat.max.toFixed(3), maxTanks: MAX_TANKS, netHz: NET_HZ, list: [...rooms.values()].map(r => ({ id: r.id, variant: r.mode, humans: r.members.size, tanks: r.host.world.tanks.length, alive: r.host.world.tanks.filter(t => t.alive).length })) })); }
   let p = path.normalize(path.join(WWW, decodeURIComponent(u.pathname)));
