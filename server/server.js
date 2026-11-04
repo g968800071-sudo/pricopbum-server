@@ -15,6 +15,8 @@ import { normLoadout } from '../src/sim/loadout.js';
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 const WWW = path.resolve(__dir, '../www');
 const PORT = +process.env.PORT || 8080, QUEUE_SECONDS = +(process.env.QUEUE_SECONDS ?? 12), MAX_ROOMS = +process.env.MAX_ROOMS || 20;
+// r31: cheap defaults for Render free (0.1 CPU): cap tanks per online room and send 15 snapshots/s. Override with MAX_TANKS / NET_HZ.
+const MAX_TANKS = +process.env.MAX_TANKS || 24, NET_HZ = +process.env.NET_HZ || 15;
 // max humans per room; free slots are filled with bots
 const CAP = { moba: 10, br: 100, brg: 100, cbr: 100, cbr2: 100, cbr3: 100, cbr4: 100, cbr5: 100, cbr20: 100, ffa: 30, team: 20, team20: 40, arena: 6, duel: 2, koth: 10, sniper: 10, ctf: 10, race: 8, survival: 8, zombie: 8, boss: 8, coop: 4 };
 const MAP_SIZES = { arena: [72, 48], duel: [72, 48], koth: [110, 72], sniper: [110, 72], ctf: [100, 64] };
@@ -34,6 +36,7 @@ function roomOpts(variant, n, cfg) {
   if (cfg.target) { if (V.mode === 'br' && !o.ffa) o.brKills = cfg.target; else o.target = cfg.target; }
   if (cfg.equal === false) o.free = true; else o.equal = true; // r20: «Равные условия» also removes mythic +20% HP/dmg
   if (cfg.cam != null && cfg.cam >= 0) o.camLock = cfg.cam;
+  if (o.total) o.total = Math.max(n, Math.min(o.total, MAX_TANKS)); if (o.perTeam) o.perTeam = Math.max(Math.ceil(n / 2), Math.min(o.perTeam, MAX_TANKS >> 1));
   return { mode: V.mode, opts: o };
 }
 const ROOM_VARIANTS = Object.keys(CAP);
@@ -57,13 +60,13 @@ const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (u.pathname === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('PRICOPBUM server OK'); }
-  if (u.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, players: clients.size, rooms: rooms.size, privateRooms: codes.size, stepMs: +stepStat.avg.toFixed(3), stepMaxMs: +stepStat.max.toFixed(3), list: [...rooms.values()].map(r => ({ id: r.id, variant: r.mode, humans: r.members.size, tanks: r.host.world.tanks.length, alive: r.host.world.tanks.filter(t => t.alive).length })) })); }
+  if (u.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, players: clients.size, rooms: rooms.size, privateRooms: codes.size, stepMs: +stepStat.avg.toFixed(3), stepMaxMs: +stepStat.max.toFixed(3), maxTanks: MAX_TANKS, netHz: NET_HZ, list: [...rooms.values()].map(r => ({ id: r.id, variant: r.mode, humans: r.members.size, tanks: r.host.world.tanks.length, alive: r.host.world.tanks.filter(t => t.alive).length })) })); }
   let p = path.normalize(path.join(WWW, decodeURIComponent(u.pathname)));
   if (!p.startsWith(WWW)) { res.writeHead(403); return res.end(); }
   if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, 'index.html');
   fs.readFile(p, (err, data) => { if (err) { res.writeHead(404); return res.end('not found'); } res.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream', 'cache-control': 'no-cache' }); res.end(data); });
 });
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096 });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096, perMessageDeflate: { threshold: 512, zlibDeflateOptions: { level: 1 }, serverNoContextTakeover: false, concurrencyLimit: 4 } });
 const clients = new Map(); let nextCid = 1;
 const queues = Object.fromEntries(Object.keys(CAP).map(k => [k, []])); const queueStart = Object.fromEntries(Object.keys(CAP).map(k => [k, 0]));
 const rooms = new Map(); let nextRoom = 1;
@@ -116,7 +119,7 @@ function startRoom(variant, members, code, cfg) {
   const id = nextRoom++; const map = new Map(members.map(c => [c.id, c]));
   const players = members.map(c => ({ ...c.hello, cid: c.id, team: c.team ?? undefined }));
   const { mode, opts } = roomOpts(variant, members.length, cfg); if (code) opts.code = code;
-  const host = new HostSession({ mode, players, opts, send: (cid, msg) => { const c = map.get(cid); if (c) send(c, msg); } });
+  const host = new HostSession({ mode, players, opts, send: (cid, msg) => { const c = map.get(cid); if (c) send(c, msg); } }); host.netDiv = Math.max(1, Math.round(60 / NET_HZ));
   const room = { id, mode: variant, host, members: map, created: Date.now() };
   for (const c of members) c.room = room;
   rooms.set(id, room); host.startAll();

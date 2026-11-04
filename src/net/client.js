@@ -57,7 +57,7 @@ export class NetView {
     for (const t of this.tanks) {
       if (!t.seen) continue; if (t.tx === undefined) continue;
       // extrapolate target slightly with velocity, then ease
-      const ex = t.tx + t.vx * Math.min(0.1, this.clock - t.snapT), ey = t.ty + t.vy * Math.min(0.1, this.clock - t.snapT);
+      const ex = t.tx + t.vx * Math.min(0.25, this.clock - t.snapT), ey = t.ty + t.vy * Math.min(0.25, this.clock - t.snapT);
       t.x += (ex - t.x) * k; t.y += (ey - t.y) * k; t.a += angD(t.a, t.taa) * k; t.ta += angD(t.ta, t.tta) * k;
       t.recoil = Math.max(0, t.recoil - dt * 6); t.hitT = Math.max(0, t.hitT - dt); t.tread += Math.hypot(t.vx, t.vy) * dt;
     }
@@ -86,18 +86,22 @@ export class RemoteSession {
   destroy() { this.tr.handlers = this.tr.handlers.filter(h => h !== this.off); }
 }
 
+export const ONLINE_URL = 'wss://pricopbum-server.onrender.com/ws';
 export class NetClient {
   constructor(app) { this.app = app; this.status = 'offline'; this.tr = null; this.players = 0; }
   defaultUrl() {
-    try { const l = window.location; if (l && /^https?:$/.test(l.protocol) && l.hostname && !/cursor\.com$/.test(l.hostname)) return (l.protocol === 'https:' ? 'wss://' : 'ws://') + l.host + '/ws'; } catch (e) {}
-    return 'ws://localhost:8080/ws';
+    try { const l = window.location; if (l && /^https?:$/.test(l.protocol) && l.hostname && (/onrender\.com$/.test(l.hostname) || (/^(localhost|127\.0\.0\.1)$/.test(l.hostname) && l.port))) return (l.protocol === 'https:' ? 'wss://' : 'ws://') + l.host + '/ws'; } catch (e) {}
+    return ONLINE_URL;
   }
   set(st) { this.status = st; this.app.ui.setNetStatus(); }
-  connect(url) {
-    url = url || this.defaultUrl(); if (!/^wss?:\/\//.test(url)) url = 'ws://' + url;
+  connect(url, attempt = 0) {
+    url = url || this.defaultUrl(); if (/pages\.grok\.bot|cursor\.com/.test(url)) url = ONLINE_URL; if (/localhost:8080/.test(url) && !/^(localhost|127\.)/.test((typeof location !== 'undefined' && location.hostname) || '')) url = ONLINE_URL; if (!/^wss?:\/\//.test(url)) url = 'ws://' + url;
+    if (attempt === 0) this.wakeT0 = Date.now(); clearTimeout(this.retryT);
     this.app.meta.d.server = url; this.app.meta.save(); this.disconnect(); this.set('connecting');
     let tr; try { tr = new WsTransport(url); } catch (e) { this.set('error'); this.app.ui.toast('Неверный адрес сервера', 'info'); return; }
-    this.tr = tr; const to = setTimeout(() => { if (this.status === 'connecting') { this.set('error'); this.app.ui.toast('Сервер не отвечает', 'info'); tr.close(); } }, 6000);
+    this.tr = tr; const canRetry = () => /onrender\.com/.test(url) && Date.now() - this.wakeT0 < 90000;
+    const retry = () => { tr.dead = true; tr.close(); if (this.tr === tr) this.tr = null; this.app.ui.toast('Сервер просыпается… подождите до минуты', 'globe'); this.retryT = setTimeout(() => { if (this.status === 'connecting') this.connect(url, attempt + 1); }, 2500); };
+    const to = setTimeout(() => { if (this.status === 'connecting') { if (canRetry()) return retry(); this.set('error'); this.app.ui.toast('Сервер не отвечает', 'info'); tr.close(); } }, 12000);
     tr.onOpen(() => { const p = this.app.playerCfg(); tr.send({ t: 'hello', v: PROTO, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, build: p.build, loadout: p.loadout, cc: p.cc }); });
     tr.onMessage((m) => {
       if (m.t === 'welcome') { clearTimeout(to); this.players = m.players; this.set('online'); this.app.ui.toast('Подключено к серверу', 'globe'); }
@@ -109,7 +113,7 @@ export class NetClient {
       else if (m.t === 'roomChat') { this.app.ui.roomChatMsg(m); }
       else if (m.t === 'err') { this.app.ui.toast(m.msg || 'Ошибка сервера', 'info'); }
     });
-    tr.onClose(() => { clearTimeout(to); const was = this.status; this.tr = null; this.closeQueue(); this.set(was === 'connecting' ? 'error' : 'offline'); if (this.app.state === 'game' && this.app.session && this.app.session.online && this.app.session.tr === tr) { this.app.ui.toast('Соединение потеряно', 'info'); this.app.quitToMenu(); } });
+    tr.onClose(() => { clearTimeout(to); if (tr.dead) return; if (this.status === 'connecting' && canRetry()) return retry(); const was = this.status; this.tr = null; this.closeQueue(); this.set(was === 'connecting' ? 'error' : 'offline'); if (this.app.state === 'game' && this.app.session && this.app.session.online && this.app.session.tr === tr) { this.app.ui.toast('Соединение потеряно', 'info'); this.app.quitToMenu(); } });
   }
   disconnect() { if (this.tr) { const t = this.tr; this.tr = null; t.close(); } this.status = 'offline'; }
   quickMatch(mode) { if (!this.tr) return this.app.ui.toast('Сначала подключитесь к серверу', 'info'); const p = this.app.playerCfg(); this.tr.send({ t: 'qm', mode, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, build: p.build, loadout: p.loadout }); }

@@ -23,7 +23,7 @@ export class HostSession {
   step(dt) {
     const w = this.world; w.step(dt); this.tick++;
     for (const c of this.clients.values()) for (const e of w.events) c.evBuf.push(e);
-    if (this.tick % 3 === 0) this.broadcast();
+    if (this.tick % (this.netDiv || 3) === 0) this.broadcast();
     if (w.result && !this.ended) { this.ended = true; }
     if (this.ended) this.endT += dt;
   }

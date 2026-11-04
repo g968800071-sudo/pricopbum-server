@@ -37,7 +37,8 @@ export function snapshot(world, focus, evs, tiles, full, self) {
   for (const b of world.bullets) if ((b.layer | 0) === FL && (b.x - fx) ** 2 + (b.y - fy) ** 2 < R2) bullets.push([b.id, r1(b.x), r1(b.y), Math.round(b.vx), Math.round(b.vy), WI[b.w] || 0]);
   const pickups = [];
   // BR loot stays a sealed «Добыча» bag until the viewer is close (contents are not even sent)
-  for (const p of world.pickups) { if ((p.layer | 0) !== FL) continue; const d2 = (p.x - fx) ** 2 + (p.y - fy) ** 2; if (d2 >= R2) continue; if (world.mode === 'br' && d2 > LOOT_REVEAL * LOOT_REVEAL) pickups.push([p.id, r1(p.x), r1(p.y), 'loot', -1, r1(p.life), 1]); else pickups.push([p.id, r1(p.x), r1(p.y), p.type, p.wid ? WI[p.wid] : -1, r1(p.life), p.tier || 1, p.ak || 0, p.items ? p.items.map(o => [o.type, o.n || 0, o.wid ? WI[o.wid] : -1, o.tier || 1, o.lid ?? -1]) : 0, p.lid ?? -1]); }
+  const PR2 = Math.min(R2, 760 * 760); // r31: pickups only near the viewer in every mode (was whole map → most of the snapshot)
+  for (const p of world.pickups) { if ((p.layer | 0) !== FL) continue; const d2 = (p.x - fx) ** 2 + (p.y - fy) ** 2; if (d2 >= PR2) continue; if (world.mode === 'br' && d2 > LOOT_REVEAL * LOOT_REVEAL) pickups.push([p.id, r1(p.x), r1(p.y), 'loot', -1, r1(p.life), 1]); else pickups.push([p.id, r1(p.x), r1(p.y), p.type, p.wid ? WI[p.wid] : -1, r1(p.life), p.tier || 1, p.ak || 0, p.items ? p.items.map(o => [o.type, o.n || 0, o.wid ? WI[o.wid] : -1, o.tier || 1, o.lid ?? -1]) : 0, p.lid ?? -1]); }
   const ev = evs.filter(e => e.k === 'kill' || e.k === 'zone' || e.k === 'go' || e.k === 'end' || e.k === 'baseDown' || e.x === undefined || (e.x - fx) ** 2 + (e.y - fy) ** 2 < R2);
   const s = { t: 's', tm: r2(world.time), st: world.state, cd: r1(world.countdown), T: tanks, B: bullets, P: pickups, E: ev, tc: tiles };
   if (world.zone) { const z = world.zone; s.z = [r1(z.cx), r1(z.cy), r1(z.r), r1(z.tcx), r1(z.tcy), r1(z.tr), z.state, r1(z.timer)]; }
