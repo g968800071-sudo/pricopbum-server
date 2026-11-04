@@ -66,7 +66,7 @@ export function botThink(w, t, dt) {
     let best = null, bd = 1e12; tmp2.length = 0;
     if (!w.ffa) for (const f of w.near(t.x, t.y, 260, tmpF)) if (f !== t && f.alive && f.team === t.team) tmp2.push(f);
     for (const o of w.near(t.x, t.y, range, tmp)) {
-      if (!o.alive || o.team === t.team || o.spawnT > 0) continue; if (!canSee(w, t, o, range)) continue;
+      if (!o.alive || o.team === t.team || o.spawnT > 0) continue; if (!canSee(w, t, o, range)) continue; if ((o.human || o.simHuman) && w.mode !== 'classic') { if (ai.calm == null) ai.calm = [14, 12, 8, 7, 6, 6][w.diff ? w.diff.id | 0 : 1] + Math.random() * 6; const hit = t.lastAtk === o.id && w.time - (t.lastAtkT || -9) < 4, dd = (o.x - t.x) ** 2 + (o.y - t.y) ** 2; if (w.time < ai.calm && dd > 130 * 130 && !hit) continue; } // r33: opening phase — scout/loot first, only fight the player if he comes close or shoots
       const d2 = (o.x - t.x) ** 2 + (o.y - t.y) ** 2 * 1; let score = d2 * (o.human && classic ? 0.5 : 1) * (o.hp < 40 ? 0.7 : 1) * (ai.tac !== false && ai.skill > 0.3 ? 0.55 + 0.45 * Math.min(1, (o.hp + (o.armorHp || 0)) / (o.maxHp || 100)) : 1); // r25: finish weak targets first
       if (o.id === ai.target) score *= 0.75; if (!w.ffa && ai.skill > 0.3) for (const f of tmp2) if (f.ai && f.ai.target === o.id) score *= 0.6; // focus fire with the squad
       if ((o.human || o.simHuman) && w.diff && w.diff.fc < 9) { let n = 0; for (const b of w.tanks) if (b !== t && b.alive && b.ai && b.team === t.team && b.ai.target === o.id) n++; if (n >= w.diff.fc && o.id !== ai.target) score *= 6; } // r19: cap bots ganging up on the player
@@ -76,7 +76,7 @@ export function botThink(w, t, dt) {
     if (t.lastAtk && w.time - t.lastAtkT < 3) { const at = w.byId.get(t.lastAtk); if (at && at.alive && at.team !== t.team && Math.hypot(at.x - t.x, at.y - t.y) < 200) best = attacker = at; }
     ai.avoid = 0;
     if (best && best !== attacker && Math.hypot(best.x - t.x, best.y - t.y) > engageR) { ai.avoid = best.id; best = null; }
-    if ((best ? best.id : 0) !== ai.target && best) ai.react = (0.7 - ai.skill * 0.56) * (0.7 + Math.random() * 0.6) + ((best.human || best.simHuman) && w.diff && w.diff.rd ? w.diff.rd : 0); // human-like reaction time (+ difficulty delay vs the player)
+    if ((best ? best.id : 0) !== ai.target && best) ai.react = Math.max(0.25, Math.random() * 0.1 + 0.25 * (1 - ai.skill)) + (0.7 - ai.skill * 0.56) * (0.7 + Math.random() * 0.6) + ((best.human || best.simHuman) && w.diff && w.diff.rd ? w.diff.rd : 0); // human-like reaction time (+ difficulty delay vs the player)
     { const cv = brainThink(w, t, ai, best); if (cv && !best) { best = cv; ai.react = 0.35 - ai.skill * 0.25; } }
     ai.target = best ? best.id : 0;
     ai.cover = best && ai.skill > 0.3 ? findCover(w, t, best.x, best.y) : null;

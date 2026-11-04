@@ -123,7 +123,7 @@ export const DIFFS = [
   { id: 1, name: 'Обычный', sk: [0.12, 0.5], lv: 0, hp: 0.86, rew: 1, dk: 0.34, ae: 0.45, rd: 1.3, fc: 1, rk: 0.25 }, // r25: softened (user: dying too fast on Normal)
   { id: 2, name: 'Сложный', sk: [0.45, 0.85], lv: 3, hp: 1.1, rew: 1.3, dk: 0.85, ae: 0.05, rd: 0.15, fc: 3, rk: 0.8 },
   { id: 3, name: 'Очень сложный', sk: [0.65, 0.95], lv: 4, hp: 1.2, rew: 1.6, dk: 1, ae: 0, rd: 0.04, fc: 4, rk: 1 },
-  { id: 4, name: 'Невыносимый', sk: [0.8, 0.95], lv: 3, hp: 1.2, rew: 2.2, dk: 0.95, ae: 0.02, rd: 0.08, fc: 9, rk: 1.2 },
+  { id: 4, name: 'Невыносимый', sk: [0.8, 0.95], lv: 3, hp: 1.2, rew: 2.2, dk: 0.95, ae: 0.02, rd: 0.08, fc: 4, rk: 1.2 },
 ];
 export const SQUADS = [1, 2, 3, 4, 5, 20];
 
