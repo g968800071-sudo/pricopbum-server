@@ -1,6 +1,8 @@
 import { brainThink, brainMove } from './brain.js';
 import { bunkerBot } from './bunker.js';
 import { mobaBot } from './moba.js';
+import { huntBot, moloBot } from './huntai.js';
+import { hAt, crestBlocks } from './terrain.js';
 import { humanize } from './human.js';
 // Bot brains: target selection, lead aiming, strafing, obstacle avoidance, zone awareness.
 import { T_SWAMP, T_BUSH, T_MUD, MUD_SEE, CELL, T_BRICK, T_CRATE, T_WATER, TANK_R, WEAPONS, PARTS, LOOT_SEE } from './defs.js';
@@ -28,6 +30,8 @@ const tmp = [], tmpF = [], tmp2 = [];
 function blocked(w, x, y) { if (w.map.tankBlockedAt(x, y, TANK_R + 1)) return true; const W = w.wrecks; if (W) for (let i = 0; i < W.length; i++) { const k = W[i]; if ((k.layer | 0) === (w._L | 0) && (x - k.x) ** 2 + (y - k.y) ** 2 < 256) return true; } return false; }
 function steer(w, t, ang) {
   // pick a free direction close to desired
+  if (w.map.crush && !(t.ai && t.ai.ram)) for (const o of [0, 0.45, -0.45, 0.9, -0.9]) { // r37 «Траншеи»: bots go around houses when they can (the village lasts longer); they still plough through if boxed in
+    const a = ang + o * (t.ai.side || 1), px = t.x + Math.cos(a) * 18, py = t.y + Math.sin(a) * 18; if (w.map.get(Math.floor(px / CELL), Math.floor(py / CELL)) !== 12 && !blocked(w, px, py) && !blocked(w, t.x + Math.cos(a) * 12, t.y + Math.sin(a) * 12)) return a; }
   for (const o of [0, 0.45, -0.45, 0.9, -0.9, 1.35, -1.35, 1.9, -1.9, 2.6, -2.6]) {
     const a = ang + o * (t.ai.side || 1), px = t.x + Math.cos(a) * 12, py = t.y + Math.sin(a) * 12;
     if (!blocked(w, px, py)) return a;
@@ -47,6 +51,8 @@ function canSee(w, t, o, range) {
   const dx = o.x - t.x, dy = o.y - t.y, d2 = dx * dx + dy * dy; if (d2 > range * range) return false;
   if (t.fx && t.fx.smokeSee && d2 < 140 * 140) return true; // thermal sight
   if (o.revT > 0 && o.revTeam === t.team) return true; // revealed by a friendly «Маяк»
+  if (w.special === 'hunt' && d2 > 60 * 60 && w.time - (o.lastFire ?? -9) > 1.5 && !w.map.los(t.x, t.y, o.x, o.y)) return false; // r36 hunt: no seeing through walls/houses (target knows positions only via its minimap brain)
+  if (w.map.hgt) { const ho = hAt(w.map, o.x, o.y), ht = hAt(w.map, t.x, t.y); if (ho < -9 && ht < ho + 14 && d2 > 85 * 85 && w.time - (o.lastFire ?? -9) > 1.2) return false; if (d2 > 60 * 60 && crestBlocks(w.map, t.x, t.y, o.x, o.y)) return false; } // r37 BR relief: crater ambush / hill cover
   if (o.inBush && d2 > (o.seeR || 48) ** 2 && w.time - o.lastFire > 1.2) return false;
   if (o.terr === 1 && d2 > MUD_SEE * MUD_SEE * 2.5 && w.time - o.lastFire > 1.2) return false; // mud: partial concealment
   return true;
@@ -245,6 +251,18 @@ export function botThink(w, t, dt) {
     else if (theirs.carrier) { const c = w.byId.get(theirs.carrier); if (c && !tg) { gx = c.x + 20; gy = c.y; } }
     else { gx = theirs.x; gy = theirs.y; }
     if (gx != null) { moveA = Math.atan2(gy - t.y, gx - t.x); speedK = 1; } }
+  else if (w.map.trench && w.map.cover) { // r37 «Траншеи»: 2/5 of bots hold trench lines and fight from cover, 3/5 assault through village/forest; hurt bots fall back into a trench
+    const M = w.map, n0 = M.coverSide, low = t.hp < t.maxHp * 0.45; if (ai.tcR == null) ai.tcR = t.id % 5 < 2 ? 1 : 0; const push = w.time > 25 + (t.id % 7) * 12;
+    if (!ai.cv || w.time > ai.cvT || (low && !ai.cvLow)) { ai.cvT = w.time + 7 + Math.random() * 8; ai.cvLow = low; let best = null, bs = 1e18;
+      for (let i = (t.id & 1); i < M.cover.length; i += 2) { const p = M.cover[i], own = (i < n0) === (t.team === 0), d = Math.hypot(p[0] - t.x, p[1] - t.y); if (d > (ai.tcR && !low ? 640 : low ? 420 : 2400)) continue; let sc = d;
+        if (low) sc -= tg ? Math.hypot(p[0] - tg.x, p[1] - tg.y) * 0.8 : 0; else if (ai.tcR) sc += own ? (p[2] ? 0 : 140) : (push ? -60 : 420); else sc += own ? 2000 : 0; // assault: nearest ENEMY trench
+        if (sc < bs) { bs = sc; best = p; } } ai.cv = best; }
+    const cv = ai.cv; if (cv) { const d = Math.hypot(cv[0] - t.x, cv[1] - t.y), td = tg ? Math.hypot(tg.x - t.x, tg.y - t.y) : 1e9;
+      if (t.inTr && d < 70 && tg && td > 90 && td < 330) moveA = null; // hold the trench and shoot from cover
+      else if (!tg || low || td > 300) { if (d > 14) { moveA = Math.atan2(cv[1] - t.y, cv[0] - t.x); speedK = low ? 1 : 0.85; } else moveA = null; } } }
+  else if (w.map.hgt && !tg && w.zone) { // r37: BR bots take the high ground near them (inside the zone), sometimes lurk in craters
+    if (!ai.hg || w.time > ai.hgT) { ai.hgT = w.time + 8 + Math.random() * 10; ai.hg = null; const Z = w.zone, lurk = (t.pers && t.pers.camp) || t.id % 4 === 0; let bd = 1e9; for (const f of w.map.hz) { if ((f.h < 0) !== lurk) continue; const d = Math.hypot(f.x - t.x, f.y - t.y); if (d < 380 && d < bd && Math.hypot(f.x - Z.tcx, f.y - Z.tcy) < Math.max(80, Z.tr || Z.r)) { bd = d; ai.hg = f; } } }
+    const f = ai.hg; if (f && Math.hypot(f.x - t.x, f.y - t.y) > f.r * 0.25) { moveA = Math.atan2(f.y - t.y, f.x - t.x); speedK = 0.85; } }
   else if (w.hill && !tg && Math.random() < 0.9) { const H = w.hill; if (Math.hypot(H.x - t.x, H.y - t.y) > H.r * 0.6) moveA = Math.atan2(H.y - t.y, H.x - t.x); }
   else if (t.wave && !tg) { let bd = 1e18, b = null; for (const o of w.tanks) { if (!o.alive || o.team === t.team) continue; const d = (o.x - t.x) ** 2 + (o.y - t.y) ** 2; if (d < bd) { bd = d; b = o; } } if (b) moveA = Math.atan2(b.y - t.y, b.x - t.x); }
   ai.escT = (ai.escT || 0) - dt; if (ai.escT > 0 && w.special !== 'race') { moveA = ai.escA; speedK = 1; ai.unstick = 0; }
@@ -253,6 +271,8 @@ export function botThink(w, t, dt) {
   if (w.special === 'moba' && !t.layer) { const r = mobaBot(w, t, ai, tg && tg.alive ? tg : null); if (r) { if (r.moveA != null) { moveA = r.moveA; speedK = r.speedK ?? speedK; } if (r.aimA != null) { aimA = r.aimA; fire = r.fire; } } }
   if (w.under && !classic && (w.special !== 'moba' || t.id % 4 === 0)) { const near = tg && tg.alive && Math.hypot(tg.x - t.x, tg.y - t.y) < 200 ? tg : null; const r = bunkerBot(w, t, ai, near); if (r) { if (r.act) w.doAction(t, r.act); else { moveA = r.moveA; speedK = r.speedK ?? speedK; } } }
   if (!classic && w.special !== 'race' && !t.zombie && !(ai.escT > 0) && !(ai.dodge > 0 && !t.rvg)) { const r = brainMove(w, t, ai, tg && tg.alive ? tg : null, dt); if (r) { if (r.hold) { moveA = null; if (r.fire === false) fire = false; } else if (r.moveA != null) { moveA = r.moveA; speedK = r.speedK ?? speedK; } if (r.aimA != null && !fire) aimA = r.aimA; } }
+  if (w.special === 'hunt' && !(ai.escT > 0) && !(ai.dodge > 0)) { const r = huntBot(w, t, ai, tg && tg.alive ? tg : null, dt); if (r) { if (r.hold) { moveA = null; if (r.fire === false) fire = false; } else if (r.moveA != null) { moveA = r.moveA; speedK = r.speedK ?? speedK; } if (r.aimA != null && (!fire || r.fire)) { aimA = r.aimA; if (r.fire) fire = true; } } } // r36 «Охота» tactics
+  if (t.molotovN > 0 && tg && tg.alive) moloBot(w, t, ai, tg); // r36 Molotov
   // r25: bots know the water rule — leave water before the 30 s safe window runs out
   if ((t.wT || 0) > 17 && w.special !== 'race') { if (!(ai.wQ > 0) || ai.wA == null) { ai.wQ = 1; let best = null, bd = 1e9; for (let r = 1; r <= 14 && !best; r++) for (let k = 0; k < 16; k++) { const A = k / 16 * Math.PI * 2, x = t.x + Math.cos(A) * r * CELL, y = t.y + Math.sin(A) * r * CELL, v = w.map.get(Math.floor(x / CELL), Math.floor(y / CELL)); if (v !== T_WATER && v != null && !w.map.tankBlockedAt(x, y, TANK_R) && r < bd) { bd = r; best = A; } } ai.wA = best; } ai.wQ -= dt; if (ai.wA != null) { moveA = ai.wA; speedK = 1; } } else ai.wA = null;
   if (ai.trapAim && aimA == null || ai.trapAim && !fire) { const T = ai.trapAim; if (w.traps.includes(T)) { aimA = Math.atan2(T.y - t.y, T.x - t.x); fire = true; } }

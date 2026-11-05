@@ -4,7 +4,7 @@ import { T_HATCH } from '../sim/defs.js';
 import { decTank, mapFor, PROTO } from './protocol.js';
 import { WEAPON_LIST } from '../sim/defs.js';
 
-export const VNAME = { moba: 'Оборона баз 30×30', br: 'Королевская битва (100)', cbr: 'Конструктор BR', cbr2: 'Конструктор BR · дуо', cbr3: 'Конструктор BR · трио', cbr4: 'Конструктор BR · отряд 4', cbr5: 'Конструктор BR · отряд 5', cbr20: 'Конструктор BR · отряды по 20', team: 'Командный бой 10×10', team20: 'Битва 20×20', ffa: 'Каждый за себя', arena: 'Арена 3×3', duel: 'Дуэль 1×1', koth: 'Царь горы', sniper: 'Снайперы', ctf: 'Захват флага 5×5', race: 'Танковые гонки', brg: 'Гигантская BR', survival: 'Выживание', zombie: 'Зомби-волны', boss: 'Босс «Мамонт»', coop: 'Кооператив' };
+export const VNAME = { trench: 'Траншеи 15×15', moba: 'Оборона баз 30×30', br: 'Королевская битва (100)', cbr: 'Конструктор BR', cbr2: 'Конструктор BR · дуо', cbr3: 'Конструктор BR · трио', cbr4: 'Конструктор BR · отряд 4', cbr5: 'Конструктор BR · отряд 5', cbr20: 'Конструктор BR · отряды по 20', team: 'Командный бой 10×10', team20: 'Битва 20×20', ffa: 'Каждый за себя', arena: 'Арена 3×3', duel: 'Дуэль 1×1', koth: 'Царь горы', sniper: 'Снайперы', ctf: 'Захват флага 5×5', race: 'Танковые гонки', brg: 'Гигантская BR', survival: 'Выживание', zombie: 'Зомби-волны', boss: 'Босс «Мамонт»', coop: 'Кооператив' };
 export class WsTransport {
   constructor(url) { this.url = url; this.handlers = []; this.closeHandlers = []; this.openHandlers = [];
     try { this.ws = new WebSocket(url); } catch (e) { this.ws = { readyState: 3, send() {}, close() {} }; setTimeout(() => { for (const h of this.closeHandlers) h(); }, 0); return; }
@@ -35,7 +35,7 @@ export class NetView {
       // interpolation targets
       t.tx = t.x; t.ty = t.y; t.taa = t.a; t.tta = t.ta; if (was && Math.hypot(px - t.x, py - t.y) < 60) { t.x = px; t.y = py; t.a = pa; t.ta = pta; } t.seen = true; t.snapT = this.clock; }
     for (const t of this.tanks) if (!seen.has(t.id)) { t.seen = false; t.x = -999; }
-    this.bullets = s.B.map(b => ({ id: b[0], x: b[1], y: b[2], vx: b[3], vy: b[4], w: WEAPON_LIST[b[5]] || 'cannon' }));
+    this.bullets = s.B.map(b => ({ id: b[0], x: b[1], y: b[2], vx: b[3], vy: b[4], w: WEAPON_LIST[b[5]] || 'cannon', zap: b[6] || 0 }));
     this.pickups = s.P.map(p => ({ id: p[0], x: p[1], y: p[2], type: p[3], wid: p[4] >= 0 ? WEAPON_LIST[p[4]] : null, life: p[5], tier: p[6] || 1, ak: p[7] || 0, items: p[8] ? p[8].map(a => ({ type: a[0], n: a[1], wid: a[2] >= 0 ? WEAPON_LIST[a[2]] : null, tier: a[3], lid: a[4] >= 0 ? a[4] : undefined })) : undefined, lid: p[9] >= 0 ? p[9] : undefined }));
     this.traps = (s.tp || []).map(m => ({ id: m[0], x: m[1], y: m[2], a: m[3], team: m[4], n: m[5] })); this.drones = (s.dr || []).map(m => ({ id: m[0], x: m[1], y: m[2], a: m[3], leg: !!m[4], ph: m[5] })); this.smokes = (s.sm || []).map(m => ({ id: m[0], x: m[1], y: m[2], r: m[3], t: m[4], max: m[5] })); this.sentries = (s.se || []).map(m => ({ id: m[0], x: m[1], y: m[2], team: m[3], hp: m[4], maxHp: 70, ammo: m[5], a: m[6], layer: m[7] })); this.mines = (s.mn || []).map(m => ({ id: m[0], x: m[1], y: m[2], team: m[3], arm: m[4] }));
     if (s.z) { const z = s.z; this.zone = { cx: z[0], cy: z[1], r: z[2], tcx: z[3], tcy: z[4], tr: z[5], state: z[6], timer: z[7] }; }
@@ -48,6 +48,9 @@ export class NetView {
     if (s.rc) { this.raceOrder = s.rc.map(([id, lap, cp, fin]) => { const t = this.byId.get(id); if (t) { t.lap = lap; t.cp = cp; t.finishT = fin; } return t; }).filter(Boolean); }
     if (s.fk) for (const [id, k] of s.fk) { const t = this.byId.get(id); if (t) t.kills = k; }
     if (s.cl) { [this.lives, this.score, this.enemyKilled, this.enemyTotal] = s.cl; this.baseAlive = !!s.cl[4]; this.freezeT = s.cl[5]; }
+    if (s.hu) { this.huntHold = s.hu[1]; for (const [id, lv, out, md] of s.hu[2]) { const t = this.byId.get(id); if (t) { t.lives = lv; t.outL = !!out; t.isTarget = id === s.hu[0]; if (md != null && md >= 0) t.model = md; if (t.isTarget && s.hu[3]) t.hk = s.hu[3]; } } }
+    this.molos = (s.ml || []).map(a => ({ x: a[0], y: a[1], h: a[2] })); this.fires = (s.fi || []).map(a => ({ id: a[0], x: a[1], y: a[2], r: a[3], t: a[4], max: a[5] }));
+    if (s.hu) this.htraps = (s.ht || []).map(a => ({ id: a[0], k: a[1], x: a[2], y: a[3], team: a[4], model: a[5], a: a[6] }));
     if (s.res) this.result = s.res;
     this.time = s.tm;
     for (const e of s.E) { events.push(e); if (e.k === 'shot') { const t = this.byId.get(e.o); if (t) t.recoil = 1; } if (e.k === 'dmg') { const t = this.byId.get(e.id); if (t) t.hitT = 0.12; } }
@@ -102,7 +105,7 @@ export class NetClient {
     this.tr = tr; const canRetry = () => /onrender\.com/.test(url) && Date.now() - this.wakeT0 < 90000;
     const retry = () => { tr.dead = true; tr.close(); if (this.tr === tr) this.tr = null; this.app.ui.toast('Сервер просыпается… подождите до минуты', 'globe'); this.retryT = setTimeout(() => { if (this.status === 'connecting') this.connect(url, attempt + 1); }, 2500); };
     const to = setTimeout(() => { if (this.status === 'connecting') { if (canRetry()) return retry(); this.set('error'); this.app.ui.toast('Сервер не отвечает', 'info'); tr.close(); } }, 12000);
-    tr.onOpen(() => { const p = this.app.playerCfg(); tr.send({ t: 'hello', v: PROTO, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, build: p.build, loadout: p.loadout, cc: p.cc }); });
+    tr.onOpen(() => { const p = this.app.playerCfg(); tr.send({ t: 'hello', v: PROTO, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, tmod: p.tmod, build: p.build, loadout: p.loadout, cc: p.cc }); });
     tr.onMessage((m) => {
       if (m.t === 'welcome') { clearTimeout(to); this.players = m.players; this.set('online'); this.app.ui.toast('Подключено к серверу', 'globe'); }
       else if (m.t === 'lobby') { this.players = m.players; if (this.status === 'online') this.app.ui.setNetStatus(); }
@@ -116,9 +119,9 @@ export class NetClient {
     tr.onClose(() => { clearTimeout(to); if (tr.dead) return; if (this.status === 'connecting' && canRetry()) return retry(); const was = this.status; this.tr = null; this.closeQueue(); this.set(was === 'connecting' ? 'error' : 'offline'); if (this.app.state === 'game' && this.app.session && this.app.session.online && this.app.session.tr === tr) { this.app.ui.toast('Соединение потеряно', 'info'); this.app.quitToMenu(); } });
   }
   disconnect() { if (this.tr) { const t = this.tr; this.tr = null; t.close(); } this.status = 'offline'; }
-  quickMatch(mode) { if (!this.tr) return this.app.ui.toast('Сначала подключитесь к серверу', 'info'); const p = this.app.playerCfg(); this.tr.send({ t: 'qm', mode, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, build: p.build, loadout: p.loadout }); }
-  createRoom(variant) { if (!this.tr) return this.app.ui.toast('Сначала подключитесь к серверу', 'info'); const p = this.app.playerCfg(); this.tr.send({ t: 'create', variant, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, build: p.build, loadout: p.loadout }); }
-  joinRoom(code) { if (!this.tr) return this.app.ui.toast('Сначала подключитесь к серверу', 'info'); const p = this.app.playerCfg(); this.tr.send({ t: 'join', code: String(code || '').toUpperCase().trim(), name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, build: p.build, loadout: p.loadout }); }
+  quickMatch(mode) { if (!this.tr) return this.app.ui.toast('Сначала подключитесь к серверу', 'info'); const p = this.app.playerCfg(); this.tr.send({ t: 'qm', mode, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, tmod: p.tmod, build: p.build, loadout: p.loadout }); }
+  createRoom(variant) { if (!this.tr) return this.app.ui.toast('Сначала подключитесь к серверу', 'info'); const p = this.app.playerCfg(); this.tr.send({ t: 'create', variant, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, tmod: p.tmod, build: p.build, loadout: p.loadout }); }
+  joinRoom(code) { if (!this.tr) return this.app.ui.toast('Сначала подключитесь к серверу', 'info'); const p = this.app.playerCfg(); this.tr.send({ t: 'join', code: String(code || '').toUpperCase().trim(), name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, tmod: p.tmod, build: p.build, loadout: p.loadout }); }
   roomCmd(t, extra = {}) { if (this.tr) this.tr.send({ t, ...extra }); }
   showQueue(m) {
     const txt = 'Игроков: ' + m.n + ' · старт через ' + Math.max(0, Math.ceil(m.startIn)) + ' с';

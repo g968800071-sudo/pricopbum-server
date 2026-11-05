@@ -1,6 +1,7 @@
 // 15 themed battle maps for team / arena / duel / special modes, plus custom (editor) maps.
 import { T_MUD, T_SWAMP, T_EMPTY, T_BRICK, T_STEEL, T_WATER, T_BUSH, T_ICE, T_CRATE } from './defs.js';
 import { TileMap } from './map.js';
+import { genTrench } from './trench.js';
 import { makeRng } from './rng.js';
 
 // p: lake (0..1.6), cover (walls count multiplier), steel (share), bush, crates, ice (lake → ice share), river (vertical river with bridges)
@@ -20,7 +21,10 @@ export const MAPS = [
   { id: 'factory',  name: 'Завод',            g: ['#4a4f57', '#535861', '#42464e'], p: { lake: 0, cover: 1.8, steel: 0.7, bush: 0, crates: 2 } },
   { id: 'volcano',  name: 'Вулкан',           g: ['#3b2a26', '#45312c', '#33241f'], p: { lake: 1.2, lava: 1, cover: 1, steel: 0.45, bush: 0, crates: 1 } },
   { id: 'labyrinth',name: 'Лабиринт',         g: ['#3a4a5c', '#425366', '#334152'], p: { lake: 0, maze: 1, cover: 0.4, steel: 0.4, bush: 0.4, crates: 0.6 } },
+  { id: 'bugabum',  name: 'BUGA.BUM',         g: ['#9cc95e', '#a8d468', '#8fbc55'], p: { buga: 1 }, hunt: 1 }, // r36: hunt map (own generator, not mirrored)
+  { id: 'trenches', name: 'Траншеи',        g: ['#56603a', '#5f6a40', '#4b5432'], p: { trench: 1 }, trench: 1 }, // r37: «Траншеи» 15×15 — trenches, mud, forests, crushable village
 ];
+export const BUGA_IDX = MAPS.findIndex(m => m.id === 'bugabum'), TRENCH_IDX = MAPS.findIndex(m => m.id === 'trenches');
 
 function blob(m, rng, cx, cy, r, v, rough, mirror) {
   for (let dy = -r - 2; dy <= r + 2; dy++) for (let dx = -r - 2; dx <= r + 2; dx++) {
@@ -32,6 +36,8 @@ function blob(m, rng, cx, cy, r, v, rough, mirror) {
 // W/H in cells; default full team map (150x96). Mirror-symmetric so both sides are fair.
 export function genArena(seed, mapIdx = 0, W = 150, H = 96) {
   const def = MAPS[((mapIdx % MAPS.length) + MAPS.length) % MAPS.length], p = def.p, rng = makeRng(seed * 31 + mapIdx * 977), m = new TileMap(W, H), half = W / 2;
+  if (p.buga) return genBuga(seed, W, H, def);
+  if (p.trench) return genTrench(seed, W, H, def);
   const area = (W * H) / (150 * 96), put = (c, r, v) => { m.set(c, r, v, true); m.set(W - 1 - c, r, v, true); };
   const rectM = (c0, r0, w, h, v) => { for (let r = r0; r < r0 + h; r++) for (let c = c0; c < c0 + w; c++) put(c, r, v); };
   const bw = Math.min(16, Math.floor(W * 0.11));
@@ -112,5 +118,39 @@ export function decodeMap(code) {
 export function genCustom(code) {
   const d = decodeMap(code); if (!d) return null; const m = TileMap.from({ w: d.w, h: d.h, t: d.tiles });
   finishSides(m, 6); m.theme = { ground: '#6b5e44', g2: '#76684c', g3: '#5f533c' }; m.mapName = 'Своя карта'; m.mapId = 'custom';
+  return m;
+}
+
+// r36 «BUGA.BUM»: bright sunny meadow village for «Охота» (1 vs 5). Not mirrored: a winding creek with ice fords, ruined brick houses with doorways
+// (hiding spots), tall-grass belts, boulder fields (steel), swamp pockets to dive in, crates. Target spawns spread over the west/centre, hunters on the east edge.
+export function genBuga(seed, W = 120, H = 80, def = MAPS[BUGA_IDX]) {
+  const rng = makeRng(seed * 131 + 7), m = new TileMap(W, H), free = (c, r) => m.get(c, r) === T_EMPTY;
+  // creek: snakes north→south through the middle-west, three ice fords
+  const cx0 = Math.floor(W * 0.42); for (let r = 2; r < H - 2; r++) { const c0 = Math.floor(cx0 + Math.sin(r / 6.5 + seed % 7) * 6 + Math.sin(r / 2.3) * 1.2); for (let c = c0; c < c0 + 4; c++) m.set(c, r, T_WATER, true);
+    if (r % 26 === 12) for (let rr = r; rr < r + 4; rr++) for (let c = c0 - 1; c < c0 + 5; c++) m.set(c, rr, T_ICE, true); }
+  // swamp pockets along the creek
+  for (let i = 0; i < 6; i++) blob(m, rng, cx0 + rng.int(-10, 12), rng.int(8, H - 8), rng.int(2, 3), T_SWAMP, 0.4);
+  // ruined houses: hollow brick boxes with 1–2 doorways, a crate inside
+  const houses = []; for (let i = 0, tries = 0; i < 14 && tries < 400; tries++) { const w = rng.int(6, 9), h = rng.int(5, 7), c = rng.int(5, W - w - 14), r = rng.int(4, H - h - 4);
+    let ok = true; for (let rr = r - 2; rr < r + h + 2 && ok; rr++) for (let cc = c - 2; cc < c + w + 2; cc++) if (!free(cc, rr)) { ok = false; break; } if (!ok) continue;
+    for (let cc = c; cc < c + w; cc++) { m.set(cc, r, T_BRICK, true); m.set(cc, r + h - 1, T_BRICK, true); } for (let rr = r; rr < r + h; rr++) { m.set(c, rr, T_BRICK, true); m.set(c + w - 1, rr, T_BRICK, true); }
+    const doors = [[c + (w >> 1), r], [c + (w >> 1), r + h - 1], [c, r + (h >> 1)], [c + w - 1, r + (h >> 1)]].sort(() => rng() - 0.5).slice(0, 1 + (rng() < 0.6 ? 1 : 0));
+    for (const [dc, dr] of doors) { m.set(dc, dr, T_EMPTY, true); m.set(dc + (dr === r || dr === r + h - 1 ? 1 : 0), dr + (dc === c || dc === c + w - 1 ? 1 : 0), T_EMPTY, true); }
+    if (rng() < 0.4) { m.set(c + w - 2 - 1, r + 1, T_CRATE, true); } if (rng() < 0.3) m.set(c + rng.int(1, w - 2), r + rng.int(1, h - 2), T_BRICK, true); // half-collapsed
+    houses.push([c, r, w, h]); i++; }
+  // tall grass belts (big bush fields) and hedgerows
+  for (let i = 0; i < 16; i++) { const c = rng.int(4, W - 6), r = rng.int(4, H - 6), rx = rng.int(3, 7), ry = rng.int(2, 5); for (let a = -rx; a <= rx; a++) for (let b = -ry; b <= ry; b++) if ((a / rx) ** 2 + (b / ry) ** 2 < 1 - rng() * 0.25 && free(c + a, r + b)) m.set(c + a, r + b, T_BUSH, true); }
+  for (let i = 0; i < 10; i++) { const horiz = rng() < 0.5, c = rng.int(4, W - 14), r = rng.int(4, H - 14), len = rng.int(6, 14); for (let k = 0; k < len; k++) { const cc = horiz ? c + k : c, rr = horiz ? r : r + k; if (free(cc, rr)) m.set(cc, rr, T_BUSH, true); } }
+  // boulder fields (indestructible cover) and loose crates
+  for (let i = 0; i < 26; i++) { const c = rng.int(4, W - 6), r = rng.int(4, H - 6); if (free(c, r) && free(c + 1, r + 1) && free(c + 1, r) && free(c, r + 1)) { m.rect(c, r, 2, 2, T_STEEL); if (rng() < 0.4 && free(c + 2, r)) m.set(c + 2, r, T_STEEL, true); } }
+  for (let i = 0; i < 22; i++) { const c = rng.int(4, W - 6), r = rng.int(4, H - 6); if (free(c, r) && free(c + 1, r + 1) && free(c + 1, r) && free(c, r + 1)) m.rect(c, r, 2, 2, T_CRATE); }
+  for (let i = 0; i < 5; i++) blob(m, rng, rng.int(8, W - 8), rng.int(8, H - 8), rng.int(2, 4), T_MUD, 0.4);
+  m.rect(0, 0, W, 2, T_STEEL); m.rect(0, H - 2, W, 2, T_STEEL); m.rect(0, 0, 2, H, T_STEEL); m.rect(W - 2, 0, 2, H, T_STEEL);
+  // spawns: team 0 (target) — 10 open spots in the west/centre; team 1 (hunters) — east edge column, cleared
+  for (let r = Math.floor(H / 2 - 14); r < H / 2 + 14; r++) for (let c = W - 9; c < W - 2; c++) m.set(c, r, T_EMPTY, true);
+  m.spawns = [[], []]; const cl = (c, r) => { for (let rr = r - 1; rr <= r + 1; rr++) for (let cc = c - 1; cc <= c + 1; cc++) if (m.get(cc, rr) !== T_WATER) m.set(cc, rr, T_EMPTY, true); };
+  for (let k = 0, g = 0; k < 10; k++) { const c = 8 + Math.floor(rng() * (W * 0.5)), r = 8 + Math.floor(rng() * (H - 16)); if ((m.get(c, r) === T_WATER || m.get(c, r) === T_SWAMP) && ++g < 400) { k--; continue; } cl(c, r); m.spawns[0].push([c * 8 + 4, r * 8 + 4]); }
+  for (let k = 0; k < 10; k++) { const r = Math.floor(H / 2 - 12 + (k % 5) * 6), c = W - 5 - Math.floor(k / 5) * 3; m.spawns[1].push([c * 8 + 4, r * 8 + 4]); }
+  m.houses = houses; m.theme = { ground: def.g[0], g2: def.g[1], g3: def.g[2], speck: 'rgba(255,248,190,0.12)', dark: 'rgba(70,50,0,0.05)' }; m.sunny = 1; m.mapName = def.name; m.mapId = def.id;
   return m;
 }

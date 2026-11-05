@@ -10,12 +10,12 @@ export class TileMap {
   set(c, r, v, silent) {
     if (c < 0 || r < 0 || c >= this.w || r >= this.h) return;
     const i = r * this.w + c; if (this.t[i] === v) return;
-    this.t[i] = v; this.hp[i] = v === T_BRICK ? 1 : v === T_CRATE ? 1 : 0;
+    this.t[i] = v; this.hp[i] = v === T_BRICK || v === T_CRATE || v === 12 || v === 14 ? 1 : 0;
     if (!silent) { this.changes.push(i); this.version++; }
   }
   rect(c0, r0, cw, ch, v) { for (let r = r0; r < r0 + ch; r++) for (let c = c0; c < c0 + cw; c++) this.set(c, r, v, true); }
   solidForTank(v) { return v === 11 || v === T_BRICK || v === T_STEEL || v === T_CRATE || v === T_BASE; }
-  solidForBullet(v) { return v === 11 || v === T_BRICK || v === T_STEEL || v === T_CRATE || v === T_BASE; }
+  solidForBullet(v) { return v === 12 || v === 14 || v === 11 || v === T_BRICK || v === T_STEEL || v === T_CRATE || v === T_BASE; }
   tankBlockedAt(x, y, r) {
     const c0 = Math.floor((x - r) / CELL), c1 = Math.floor((x + r - 0.001) / CELL);
     const r0 = Math.floor((y - r) / CELL), r1 = Math.floor((y + r - 0.001) / CELL);
@@ -32,14 +32,14 @@ export class TileMap {
     const dx = x1 - x0, dy = y1 - y0, d = Math.hypot(dx, dy), n = Math.ceil(d / 5);
     for (let i = 1; i < n; i++) {
       const x = x0 + dx * i / n, y = y0 + dy * i / n; const v = this.get(Math.floor(x / CELL), Math.floor(y / CELL));
-      if (v === T_STEEL || v === T_BRICK || v === T_CRATE) return false;
+      if (v === T_STEEL || v === T_BRICK || v === T_CRATE || v === 12 || v === 14) return false; // r37 houses & trees block sight
     }
     return true;
   }
   serialize() { return { w: this.w, h: this.h, t: Array.from(this.t) }; }
-  static from(o) { const m = new TileMap(o.w, o.h); m.t.set(o.t); for (let i = 0; i < m.t.length; i++) m.hp[i] = (m.t[i] === T_BRICK || m.t[i] === T_CRATE) ? 1 : 0; return m; }
+  static from(o) { const m = new TileMap(o.w, o.h); m.t.set(o.t); for (let i = 0; i < m.t.length; i++) m.hp[i] = (m.t[i] === T_BRICK || m.t[i] === T_CRATE || m.t[i] === 12 || m.t[i] === 14) ? 1 : 0; return m; }
   encodeRLE() { const out = []; let p = this.t[0], n = 0; for (let i = 0; i < this.t.length; i++) { if (this.t[i] === p && n < 65535) n++; else { out.push(p, n); p = this.t[i]; n = 1; } } out.push(p, n); return { w: this.w, h: this.h, rle: out }; }
-  static decodeRLE(o) { const m = new TileMap(o.w, o.h); let k = 0; for (let i = 0; i < o.rle.length; i += 2) { m.t.fill(o.rle[i], k, k + o.rle[i + 1]); k += o.rle[i + 1]; } for (let i = 0; i < m.t.length; i++) m.hp[i] = (m.t[i] === T_BRICK || m.t[i] === T_CRATE) ? 1 : 0; return m; }
+  static decodeRLE(o) { const m = new TileMap(o.w, o.h); let k = 0; for (let i = 0; i < o.rle.length; i += 2) { m.t.fill(o.rle[i], k, k + o.rle[i + 1]); k += o.rle[i + 1]; } for (let i = 0; i < m.t.length; i++) m.hp[i] = (m.t[i] === T_BRICK || m.t[i] === T_CRATE || m.t[i] === 12 || m.t[i] === 14) ? 1 : 0; return m; }
 }
 
 function blob(m, rng, cx, cy, rad, v, noise = 0.35, onlyEmpty = true) {

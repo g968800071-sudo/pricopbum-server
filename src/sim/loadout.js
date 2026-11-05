@@ -76,4 +76,11 @@ SHELLS.push(
   { id: 'flt', name: 'Стреловидный', short: 'СТ', col: '#e0e0e0', dmg: 0.73, pierce: 1, spd: 1.3, desc: 'Пробивает навылет' },
   { id: 'shk', name: 'Ударно-волновой', short: 'УВ', col: '#ffd9a0', dmg: 0.65, knock: 160, desc: 'Отбрасывает цель' },
 );
+SHELLS.push(
+  // r36 «Молния»: lightning rounds from the «Ящик с молниями» (28 rounds). Tier by colour, normal-shell damage level.
+  { id: 'lw', name: 'Молния (обычная)', short: 'МЛ', col: '#f4f8ff', dmg: 1.0, spd: 1.6, zap: 1, rar: 0, crate: 1, desc: 'Белая молния · базовый урон' },
+  { id: 'lb', name: 'Молния (легендарная)', short: 'МЛ', col: '#4aa8ff', dmg: 1.1, spd: 1.6, zap: 2, rar: 3, crate: 1, desc: 'Синяя молния · урон +10%' },
+  { id: 'lr', name: 'Молния (мифическая)', short: 'МЛ', col: '#ff3b4a', dmg: 1.2, spd: 1.6, zap: 3, rar: 4, crate: 1, desc: 'Красная молния · урон +20%' },
+);
+export const ZAP_N = 28;
 SHELLS.forEach((s, i) => { SHELL_IDX[s.id] = i; });

@@ -95,6 +95,8 @@ export const PICKUPS = {
   invis:  { name: 'Невидимка', color: '#b9a7ff' }, // r26: 10 s cloak, tiers 1/4/5 → cooldown 25/20/15 s
   twinr:  { name: 'Спаренные ракеты', color: '#ff6b4a' },
   mine:   { name: 'Мина',     color: '#ff6b4a' },
+  fire:   { name: 'Ящик с огнём · Молотов ×8', color: '#ff6a1f', lab: 'Молотов ×8' }, // r36
+  zap:    { name: 'Ящик с молниями · Молния ×28', color: '#f4f8ff', lab: 'Молния ×28' }, // r36
   mod_scope: { name: 'Оптический прицел', color: '#7dffcf' }, mod_barrel: { name: 'Усиленный ствол', color: '#7dffcf' }, mod_loader: { name: 'Автомат заряжания', color: '#7dffcf' }, mod_mag: { name: 'Расширенный магазин', color: '#7dffcf' },
   loot:   { name: 'Добыча', color: '#d8c38a' },
   wreck:  { name: 'Трофеи', color: '#ff9a4a' },
@@ -166,6 +168,8 @@ export const VARIANTS = {
   zombie:  { mode: 'team', opts: { special: 'zombie', allies: 0, map: 13 } },
   boss:    { mode: 'team', opts: { special: 'boss', timeLimit: 300, map: 8 } },
   moba:    { mode: 'team', opts: { special: 'moba', perTeam: 30, timeLimit: 1505 } },
+  hunt:    { mode: 'team', opts: { special: 'hunt', perTeam: 5, target: 1e9, timeLimit: 600, map: 15, noBunker: true } }, // r36 «Охота» 1×5 on BUGA.BUM
+  trench:  { mode: 'team', opts: { special: 'trench', perTeam: 15, target: 1e9, timeLimit: 900, map: 16, mapW: 220, mapH: 130, noBunker: true } }, // r37 «Траншеи» 15×15, 15 min, more kills wins
   koth:    { mode: 'team', opts: { special: 'koth', perTeam: 5, target: 90, timeLimit: 420 } },
   sniper:  { mode: 'team', opts: { special: 'sniper', perTeam: 5, target: 30, timeLimit: 360, map: 6 } },
   ctf:     { mode: 'team', opts: { special: 'ctf', perTeam: 5, target: 3, timeLimit: 600, map: 4 } },
@@ -179,3 +183,6 @@ export const WAVE_W = ['cannon', 'cannon', 'twin', 'mg', 'rocket'];
 
 // r25: tanks can ford rivers/lakes: slower, 30 s safe, then armour → HP drain
 export const WATER_SAFE = 30, WATER_SPD = 0.5;
+
+// r36 «Охота»: target 5 lives + unlimited ammo + explicit armour/speed bonus (shown in the HUD); hunters 3 lives each; 10 min; hunters held at spawn for a head start
+export const HUNT = { tLives: 5, hLives: 3, hpMul: 1.6, spdMul: 1.12, hold: 10, time: 600 };

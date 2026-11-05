@@ -1,5 +1,6 @@
 // PRICOPBUM game server: static hosting of www/ + WebSocket matchmaking (/ws) with authoritative simulation.
 // Run: node server/server.js   (env: PORT=8080, QUEUE_SECONDS=12, MAX_ROOMS=20)
+import { normTmod } from '../src/sim/tmods.js';
 import http from 'http';
 import fs from 'fs';
 import path from 'path';
@@ -9,7 +10,7 @@ import { HostSession } from '../src/net/host.js';
 import { PROTO, sanitizeName } from '../src/net/protocol.js';
 import { VARIANTS } from '../src/sim/defs.js';
 import { MAPS, decodeMap } from '../src/sim/maps.js';
-import { buildValid } from '../src/sim/models.js';
+import { buildValid, MODELS } from '../src/sim/models.js';
 import { normLoadout } from '../src/sim/loadout.js';
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
@@ -18,8 +19,8 @@ const PORT = +process.env.PORT || 8080, QUEUE_SECONDS = +(process.env.QUEUE_SECO
 // r31: cheap defaults for Render free (0.1 CPU): cap tanks per online room and send 15 snapshots/s. Override with MAX_TANKS / NET_HZ.
 const MAX_TANKS = +process.env.MAX_TANKS || 24, NET_HZ = +process.env.NET_HZ || 15;
 // max humans per room; free slots are filled with bots
-const CAP = { moba: 10, br: 100, brg: 100, cbr: 100, cbr2: 100, cbr3: 100, cbr4: 100, cbr5: 100, cbr20: 100, ffa: 30, team: 20, team20: 40, arena: 6, duel: 2, koth: 10, sniper: 10, ctf: 10, race: 8, survival: 8, zombie: 8, boss: 8, coop: 4 };
-const MAP_SIZES = { arena: [72, 48], duel: [72, 48], koth: [110, 72], sniper: [110, 72], ctf: [100, 64] };
+const CAP = { moba: 10, br: 100, brg: 100, cbr: 100, cbr2: 100, cbr3: 100, cbr4: 100, cbr5: 100, cbr20: 100, ffa: 30, team: 20, team20: 40, arena: 6, duel: 2, koth: 10, sniper: 10, ctf: 10, hunt: 6, trench: 24, race: 8, survival: 8, zombie: 8, boss: 8, coop: 4 };
+const MAP_SIZES = { arena: [72, 48], duel: [72, 48], koth: [110, 72], sniper: [110, 72], ctf: [100, 64], hunt: [120, 80], trench: [220, 130] };
 function roomOpts(variant, n, cfg) {
   const V = VARIANTS[variant]; const o = { ...V.opts, variant }; cfg = cfg || {};
   if (V.mode === 'br' && !o.ffa && !o.giant) o.total = 100;
@@ -36,6 +37,9 @@ function roomOpts(variant, n, cfg) {
   if (cfg.target) { if (V.mode === 'br' && !o.ffa) o.brKills = cfg.target; else o.target = cfg.target; }
   if (cfg.equal === false) o.free = true; else o.equal = true; // r20: «Равные условия» also removes mythic +20% HP/dmg
   if (cfg.cam != null && cfg.cam >= 0) o.camLock = cfg.cam;
+  if (variant === 'br' || variant === 'brg') o.terrain = 1; // r37: hills & craters in the big BR
+  if (variant === 'trench') { o.map = V.opts.map; delete o.custom; o.mapW = 220; o.mapH = 130; o.timeLimit = cfg.time || 900; o.target = V.opts.target; } // r37 «Траншеи»: fixed 220×130 map, 15 min, most kills wins
+  if (variant === 'hunt') { o.map = V.opts.map; delete o.custom; o.mapW = 120; o.mapH = 80; o.perTeam = 5; o.timeLimit = 600; o.target = V.opts.target; } // r36 «Охота»: fixed BUGA.BUM, 1 target + 5 hunters, 10 min
   if (o.total) o.total = Math.max(n, Math.min(o.total, MAX_TANKS)); if (o.perTeam) o.perTeam = Math.max(Math.ceil(n / 2), Math.min(o.perTeam, MAX_TANKS >> 1));
   return { mode: V.mode, opts: o };
 }
@@ -81,13 +85,13 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (data) => {
     const now = Date.now(); if (now - c.win > 1000) { c.win = now; c.msgs = 0; } if (++c.msgs > 90) return; // rate limit
     let m; try { m = JSON.parse(data); } catch (e) { return; } if (!m || typeof m.t !== 'string') return;
-    if (m.t === 'hello') { if (m.v !== PROTO) return send(c, { t: 'err', msg: 'Обновите игру: версия протокола отличается' }); c.hello = { name: sanitizeName(m.name), cc: (typeof m.cc === 'string' && /^[A-Z]{2}$/.test(m.cc)) ? m.cc : undefined, skin: m.skin, weapon: m.weapon, lv: m.lv, model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, cc: typeof m.cc === 'string' && /^[A-Z]{2}$/.test(m.cc) ? m.cc : undefined, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; send(c, { t: 'welcome', id: c.id, players: clients.size }); lobbyInfo(); }
-    else if (m.t === 'qm') { if (!c.hello || c.room) return; const mode = CAP[m.mode] ? m.mode : 'br'; leavePrivate(c); leaveQueue(c); c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; c.mode = mode; queues[mode].push(c); if (queues[mode].length === 1) queueStart[mode] = Date.now(); queueTick(); }
+    if (m.t === 'hello') { if (m.v !== PROTO) return send(c, { t: 'err', msg: 'Обновите игру: версия протокола отличается' }); c.hello = { name: sanitizeName(m.name), cc: (typeof m.cc === 'string' && /^[A-Z]{2}$/.test(m.cc)) ? m.cc : undefined, skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, cc: typeof m.cc === 'string' && /^[A-Z]{2}$/.test(m.cc) ? m.cc : undefined, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; send(c, { t: 'welcome', id: c.id, players: clients.size }); lobbyInfo(); }
+    else if (m.t === 'qm') { if (!c.hello || c.room) return; const mode = CAP[m.mode] ? m.mode : 'br'; leavePrivate(c); leaveQueue(c); c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; c.mode = mode; queues[mode].push(c); if (queues[mode].length === 1) queueStart[mode] = Date.now(); queueTick(); }
     else if (m.t === 'cancel') leaveQueue(c);
-    else if (m.t === 'create') { if (!c.hello || c.room) return; leaveQueue(c); leavePrivate(c); const variant = CAP[m.variant] ? m.variant : 'team'; c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) };
+    else if (m.t === 'create') { if (!c.hello || c.room) return; leaveQueue(c); leavePrivate(c); const variant = CAP[m.variant] ? m.variant : 'team'; c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) };
       const r = { code: newCode(), cfg: normCfg(m.cfg || {}, { ...DEF_CFG, variant }), owner: c.id, members: new Map([[c.id, c]]), created: Date.now() }; codes.set(r.code, r); c.priv = r; roomBroadcast(r); }
     else if (m.t === 'join') { if (!c.hello || c.room) return; const r = codes.get(String(m.code || '').toUpperCase()); if (!r) return send(c, { t: 'err', msg: 'Комната с таким кодом не найдена' });
-      if (r.members.size >= CAP[r.cfg.variant]) return send(c, { t: 'err', msg: 'Комната заполнена' }); if (r.kicked && r.kicked.has(c.id)) return send(c, { t: 'err', msg: 'Создатель комнаты исключил вас' }); leaveQueue(c); leavePrivate(c); c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; r.members.set(c.id, c); c.priv = r; roomBroadcast(r); }
+      if (r.members.size >= CAP[r.cfg.variant]) return send(c, { t: 'err', msg: 'Комната заполнена' }); if (r.kicked && r.kicked.has(c.id)) return send(c, { t: 'err', msg: 'Создатель комнаты исключил вас' }); leaveQueue(c); leavePrivate(c); c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; r.members.set(c.id, c); c.priv = r; roomBroadcast(r); }
     else if (m.t === 'roomTeam') { const r = c.priv; if (!r) return; c.team = m.team === 0 || m.team === 1 ? m.team : null; roomBroadcast(r); }
     else if (m.t === 'roomVariant') { const r = c.priv; if (!r || r.owner !== c.id || !CAP[m.variant]) return; r.cfg.variant = m.variant; roomBroadcast(r); }
     else if (m.t === 'roomCfg') { const r = c.priv; if (!r || r.owner !== c.id || !m.cfg) return; r.cfg = normCfg(m.cfg, r.cfg); for (const x of r.members.values()) if (x.id !== r.owner) x.ready = false; roomBroadcast(r); }
@@ -120,6 +124,8 @@ function startRoom(variant, members, code, cfg) {
   const id = nextRoom++; const map = new Map(members.map(c => [c.id, c]));
   const players = members.map(c => ({ ...c.hello, cid: c.id, team: c.team ?? undefined }));
   const { mode, opts } = roomOpts(variant, members.length, cfg); if (code) opts.code = code;
+  { const avg = (rar) => { const L = players.filter(p => p.tmod && MODELS[p.model] && MODELS[p.model].rar === rar).map(p => p.tmod); return L.length ? L[0].map((_, i) => Math.round(L.reduce((a, b) => a + b[i], 0) / L.length)) : null; }; const lg = avg(3), my = avg(4); if (lg) opts.botMods = lg; if (my) opts.botMythMods = my; } // r37: bots get the average mod levels of the humans in the room (equal rules)
+  if (variant === 'hunt' && members.length) { let lo = Infinity; for (const c of members) lo = Math.min(lo, c.huntN | 0); const P = members.filter(c => (c.huntN | 0) === lo), T = P[Math.floor(Math.random() * P.length)]; T.huntN = (T.huntN | 0) + 1; opts.huntTarget = T.id; for (const p of players) p.team = undefined; } // r36: the target role rotates — whoever was target least often
   const host = new HostSession({ mode, players, opts, send: (cid, msg) => { const c = map.get(cid); if (c) send(c, msg); } }); host.netDiv = Math.max(1, Math.round(60 / NET_HZ));
   const room = { id, mode: variant, host, members: map, created: Date.now() };
   for (const c of members) c.room = room;

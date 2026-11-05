@@ -2,8 +2,8 @@ import { ccOfName } from './flags.js';
 import { GMODS, gmFx, GM_CAP } from './gmods.js';
 export const DMG_BASE = 1.3; // r26 (user: shots felt too weak)
 // PRICOPBUM core simulation — deterministic-ish, DOM-free. Runs in the browser (offline / Bluetooth host) and on the Node server.
-import { LOOTX, ROCKETS, MINES, WEAPON_VARS, SPARES, PERKS, MODS2, rollLootX, rollGear, GEAR , MYTH_GEAR } from './loot.js';
-import { SHELLS, normLoadout, personaLoadout, pickShell } from './loadout.js';
+import { LOOTX, ROCKETS, MINES, WEAPON_VARS, SPARES, PERKS, MODS2, rollLootX, rollGear, GEAR , MYTH_GEAR , FMODS, rollFmod, fmodFx } from './loot.js';
+import { SHELLS, SHELL_IDX, ZAP_N, normLoadout, personaLoadout, pickShell } from './loadout.js';
 import { MODEL_COUNT, modelOf, buildValid, buildStats, randomBuild, DEFAULT_BUILD, normBuild, personaBuild, visSig } from './models.js';
 const MOUNT_AMMO = { mg: 120, twin: 60, rocket: 16, cannon: 40, heavy: 24 };
 import { WATER_SAFE, WATER_SPD } from './defs.js';
@@ -35,6 +35,18 @@ const TAU = Math.PI * 2;
 export const HP_MUL = 2.4;
 export const angDiff = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
 
+import { HUNT } from './defs.js';
+const ARMOR_K = 1.25;
+import { htUse, htStep, htBullet, htKit } from './htraps.js';
+import { normTmod, applyTmod } from './tmods.js';
+import { addTerrain, hAt, slopeK } from './terrain.js';
+import { mlThrow, mlStep, ML_N } from './molotov.js';
+import { MODELS } from './models.js';
+import { T_HOUSE, T_TREE, T_TRENCH, TRENCH_SPD, TRENCH_SEE, crushTank, collapse } from './trench.js';
+// r36 «Охота»: hunters drive only common (rar 0) or legendary (rar 3) tanks
+const HUNT_POOL = [MODELS.filter(m => m.rar === 0).map(m => m.id), MODELS.filter(m => m.rar === 3).map(m => m.id)];
+const HUNT_TGT = (() => { const by = new Map(); for (const m of MODELS) { const b = by.get(m.ci); if (!b || m.rar > b.rar || (m.rar === b.rar && m.hp + m.spd > b.hp + b.spd)) by.set(m.ci, m); } return [...by.values()].map(m => m.id); })(); // strongest tank of every class — the target cycles through them
+export function huntModel(rng, want) { if (want != null && MODELS[want]) { const M = MODELS[want]; if (M.rar === 0 || M.rar === 3) return want; const pool = M.rar === 4 ? HUNT_POOL[1] : HUNT_POOL[0], same = pool.filter(id => MODELS[id].ci === M.ci); const P = same.length ? same : pool; return P[Math.floor(rng() * P.length)]; } const P = HUNT_POOL[rng() < 0.6 ? 0 : 1]; return P[Math.floor(rng() * P.length)]; }
 export const MODE_INFO = {
   br:      { name: 'Королевская битва', short: 'КОРОЛЕВСКАЯ БИТВА' },
   team:    { name: 'Командный бой 10×10', short: 'КОМАНДНЫЙ БОЙ' },
@@ -66,7 +78,7 @@ export class World {
     const lv = o.lv || { dmg: 0, reload: 0, armor: 0, engine: 0 };
     // r15: tanks are ~2.4x tougher outside classic so fights last and feel tactical
     const hpMul = this.mode === 'classic' ? 1 : (this.opts.hpMul ?? HP_MUL);
-    const maxHp = Math.round((o.hp || 100) * hpMul * (1 + UPGRADES.armor.per * lv.armor));
+    const maxHp = Math.round((o.hp || 100) * hpMul * ARMOR_K * (1 + UPGRADES.armor.per * lv.armor)); // r36: +25% armour for every tank on every map/mode
     const t = { id: this.id(), x: o.x, y: o.y, a: o.a ?? -Math.PI / 2, ta: o.a ?? -Math.PI / 2, vx: 0, vy: 0, hp: maxHp, maxHp, shield: 0,
       team: o.team, name: o.name, cc: o.cc || ccOfName(o.name), skin: o.skin || 'olive', weapon: o.weapon || 'cannon', lv, cd: 0.4, alive: true, human: !!o.human, cid: o.cid ?? null,
       kills: 0, dmg: 0, place: 0, lives: 3 + (o.human ? Math.min(5, o.extraLives | 0) : 0), prk: o.rki ?? 0, inv: o.inv ?? 2, speedT: 0, powerT: 0, speed: o.speed || 70, bulletMul: o.bulletMul || 1, dmgMul: o.dmgMul || 1,
@@ -75,7 +87,7 @@ export class World {
     // r15: chosen tank model (humans) or a random one (bots) scales HP/speed/armour/reload within ±15%
     // r16: every bot assembles its own build (personality-matched, quality by difficulty) and every tank on the field looks different
     let bld = o.build ? normBuild(o.build) : null; const S = this._vsig || (this._vsig = new Set());
-    if (this.mode === 'classic' || o.etype || this.special === 'race') bld = o.human && this.opts.cbuild && buildValid(bld) && this.mode !== 'classic' ? bld : null;
+    if (this.mode === 'classic' || o.etype || this.special === 'race' || this.special === 'hunt') bld = o.human && this.opts.cbuild && buildValid(bld) && this.mode !== 'classic' && this.special !== 'hunt' ? bld : null;
     else if (!o.human) { const pers = personaOf(t.id), sk = this.diff ? (this.diff.sk[0] + this.diff.sk[1]) / 2 : 0.5; t.pers = pers; for (let k = 0; k < 30; k++) { bld = personaBuild(pers, this.rng, sk); if (!S.has(visSig(bld, 0))) break; } }
     else if (!buildValid(bld)) bld = this.opts.cbuild ? DEFAULT_BUILD.slice() : null;
     if (bld) { let hue = 0; while (S.has(visSig(bld, hue)) && hue < 40) hue++; S.add(visSig(bld, hue)); t.hue = hue; }
@@ -85,11 +97,13 @@ export class World {
       if (B.ak >= 0) { t.armorT = 1; t.armorHp = armorMax(1); t.armorK = B.ak; } this.initLoadout(t, o); this.mythBot(t, o); this.tankLvl(t, o); this.tanks.push(t); this.byId.set(t.id, t); return t; }
     let mid = o.model; if (mid == null && !o.human && !o.etype && !(t.skin || '').startsWith('enemy')) mid = Math.floor(this.rng() * MODEL_COUNT);
     if (mid != null && this.mode !== 'classic') { const M = modelOf(mid); t.model = M.id; t.maxHp = t.hp = Math.round(t.maxHp * M.hp * (this.opts.equal ? 1 : RAR_K[M.rar] || 1)); t.speed *= M.spd; t.armMul = M.arm; t.relMul = M.rel; } else t.model = mid == null ? -1 : mid | 0;
-    this.initLoadout(t, o); this.mythBot(t, o); this.tankLvl(t, o); this.tanks.push(t); this.byId.set(t.id, t); return t;
+    this.initLoadout(t, o); this.mythBot(t, o); this.tankLvl(t, o); this.tankMods(t, o); this.tanks.push(t); this.byId.set(t.id, t); return t;
   }
   // r16 loadout: shells + equipment (validated by normLoadout — the server runs this same sim)
   // r22: user rule — on Hard (and above) ~50% of bots spawn with mythic gear (random mix: tank / turret / MG / rockets); Easy/Normal: none
   // r25: persistent tank level (players: from save; bots: rolled by difficulty) → small capped bonus, shown on the plate
+  // r37: permanent mods — legendary (coins) / mythic (real money) models only; bots use the bot economy levels passed by the client/server
+  tankMods(t, o) { if (this.mode === 'classic' || !(t.model >= 0)) return; const r = modelOf(t.model).rar; if (r < 3) return; const L = normTmod(o.human ? o.tmod : (r === 4 ? this.opts.botMythMods : this.opts.botMods)); if (L) applyTmod(t, L); }
   tankLvl(t, o) { let lv = o.tlv; if (lv == null) { if (!t.ai || this.opts.equal) return; const d = this.diff ? this.diff.id : 1; let hsh = 7; for (const ch of String(t.name || '')) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0; lv = Math.max(1, Math.min(20, Math.round([2, 5, 9, 13, 17][d] + ((hsh % 1000) / 1000 - 0.5) * 8))); t.prk = 1 + Math.min(18, Math.round(lv * 0.8 + (hsh >> 10) % 4)); if (this.opts.botRk && this.opts.botRk[t.name] != null) t.prk = this.opts.botRk[t.name]; } // r26: persistent bot identity — same nickname ⇒ same tank level & rank every match
     t.tlv = 'Ур.' + lv; if (this.opts.equal || this.mode === 'classic') return; const k = Math.min(19, lv - 1) * 0.005; if (k) this.applyFx(t, { rel: 1 - k, spread: 1 - k, arm: 1 + k }); }
   mythBot(t, o) { if (t.human || !t.ai || (o.etype && /boss/.test(o.etype)) || this.opts.equal) return; const d = this.diff ? this.diff.id : 1, P = [0, 0, 0.5, 0.65, 0.8][d] || 0; /* r25: Hard 50% … hardest 80% */ if (!P || this.rng() >= P) return;
@@ -145,6 +159,7 @@ export class World {
       case 'gmod': { const M = GMODS[L.i], gm = t.gm || (t.gm = []), j = gm.findIndex(x => x[0] === L.i); /* r27 gameplay mods: same kind → keep the stronger */
         const pw = (L.tier || 1) * 10 + (L.lv || 1); if (j >= 0) { if (gm[j][1] * 10 + gm[j][2] >= pw) return false; gm.splice(j, 1); } else if (gm.length >= GM_CAP) return false;
         gm.push([L.i, L.tier || 1, L.lv || 1]); this.applyGM(t, M, L.tier || 1, L.lv || 1); break; }
+      case 'fmod': { const M = FMODS[L.i]; if (!M) return false; t.fmN = (t.fmN || 0) + 1; if (M.k === 'hp') { const k = Math.min(1 + M.v / 100, (t.hp0 || (t.hp0 = t.maxHp)) * 1.3 / t.maxHp); t.maxHp = Math.round(t.maxHp * k); t.hp = Math.min(t.maxHp, Math.round(t.hp * k)); } else this.applyFx(t, fmodFx(M)); break; } // r37 field mod: +2…5%, this battle only
       case 'mod': { const fl = t.modN || 0; if (fl >= MOD_CAP) return false; /* r25: 10 mod slots (was 4) */ t.modN = fl + 1; this.applyFx(t, MODS2[L.i].fx); break; }
     }
     this.ev({ k: 'pick', id: t.id, type: 'lx', lid: p.lid, x: p.x, y: p.y }); return true; }
@@ -181,7 +196,7 @@ export class World {
   botSkill() { return this.rng.range(this.diff.sk[0], this.diff.sk[1]); }
   botLv(maxL) { maxL = this.diff.lv; const r = this.rng; return { dmg: r.int(0, maxL), reload: r.int(0, maxL), armor: r.int(0, maxL), engine: r.int(0, maxL) }; }
   initBR() {
-    const o = this.opts; this.map = genBR(this.seed, o.mapSize || 340); const m = this.map;
+    const o = this.opts; this.map = genBR(this.seed, o.mapSize || 340); const m = this.map; if (o.terrain && !o.ffa && !o.cbuild) addTerrain(m, this.seed); // r37: hills & craters only in the big BR
     const total = o.total || 100, humans = o.players || [];
     this.zone = { cx: m.pw / 2, cy: m.ph / 2, r: Math.hypot(m.pw, m.ph) / 2 + 40, tcx: m.pw / 2, tcy: m.ph / 2, tr: 0, phase: -1, timer: 0, state: 'wait', dps: 0, sr: 0, scx: 0, scy: 0 };
     this.ffa = !!o.ffa; if (this.ffa) { this.target = o.target || 25; this.timeLimit = o.timeLimit || 300; }
@@ -209,7 +224,7 @@ export class World {
     const sq = this.squad; this.squadCount = Math.ceil(total / sq); let lead = null;
     const spotFor = (i, md) => { if (i % sq === 0 || !lead) { lead = this.freeSpot(md); return lead; } for (let k = 0; k < 40; k++) { const a = this.rng() * TAU, r = 26 + this.rng() * (sq > 5 ? 90 : 40); const x = lead[0] + Math.cos(a) * r, y = lead[1] + Math.sin(a) * r; if (x > 30 && y > 30 && x < m.pw - 30 && y < m.ph - 30 && !m.tankBlockedAt(x, y, TANK_R + 3)) return [x, y]; } return this.freeSpot(md); };
     const teamOf = (i) => 1000 + Math.floor(i / sq);
-    for (const h of humans) { const [x, y] = spotFor(this.tanks.length, 90); this.makeTank({ x, y, team: sq > 1 ? teamOf(this.tanks.length) : 1000 + this.tanks.length, name: h.name, cc: h.cc, skin: h.skin, weapon: h.weapon, lv: h.lv, human: true, tlv: h.tlv, rki: h.rki, extraLives: h.extraLives, tur: h.tur, buy: h.buy, ib: h.ib, cid: h.cid, model: h.model, build: h.build, a: this.rng() * TAU, inv: 3, hp: 140 }); }
+    for (const h of humans) { const [x, y] = spotFor(this.tanks.length, 90); this.makeTank({ x, y, team: sq > 1 ? teamOf(this.tanks.length) : 1000 + this.tanks.length, name: h.name, cc: h.cc, skin: h.skin, weapon: h.weapon, lv: h.lv, human: true, tlv: h.tlv, tmod: h.tmod, rki: h.rki, extraLives: h.extraLives, tur: h.tur, buy: h.buy, ib: h.ib, cid: h.cid, model: h.model, build: h.build, a: this.rng() * TAU, inv: 3, hp: 140 }); }
     while (this.tanks.length < total) {
       const [x, y] = spotFor(this.tanks.length, 70); const sk = this.botSkill();
       const nm = names[ni % names.length] + (ni >= names.length ? ' ' + (1 + Math.floor(ni / names.length)) : ''); ni++;
@@ -241,14 +256,27 @@ export class World {
     if (sp0 === 'survival' || sp0 === 'zombie') { this.wave = 0; this.waveT = 2; this.lives = o.lives ?? 3; this.timeLimit = 1e9; this.target = 1e9; }
     const names = (this.opts.botNames || []).concat(BOT_NAMES.slice().sort(() => this.rng() - 0.5)); let ni = 0;
     const counts = [0, 0];
-    for (const h of humans) { const team = h.team ?? (counts[0] <= counts[1] ? 0 : 1); const sp = this.map.spawns[team][counts[team] % 10]; counts[team]++; this.makeTank({ x: sp[0], y: sp[1], team, name: h.name, cc: h.cc, skin: h.skin, weapon: h.weapon, lv: h.lv, human: true, tlv: h.tlv, rki: h.rki, extraLives: h.extraLives, tur: h.tur, buy: h.buy, ib: h.ib, cid: h.cid, model: h.model, a: team ? Math.PI : 0, inv: 3 }); }
-    const perT = sp0 === 'survival' || sp0 === 'zombie' ? [Math.max(counts[0], o.allies ?? 0), 0] : sp0 === 'boss' ? [Math.max(counts[0], 4), 0] : o.noBots ? [counts[0], counts[1]] : [per, per];
-    for (let team = 0; team < 2; team++) while (counts[team] < perT[team]) { const k = counts[team], sp = this.map.spawns[team][k % 10], off = Math.floor(k / 10) * 16 * (team ? -1 : 1); counts[team]++; this.makeTank({ x: sp[0] + off, y: sp[1], team, name: names[ni++ % names.length], skin: 'team', weapon: this.rng() < 0.55 ? 'cannon' : this.rng.pick(WEAPON_LIST), lv: this.botLv(this.opts.botLevel ?? 2), skill: this.botSkill(), a: team ? Math.PI : 0, inv: 3, hp: 100 }); }
+    if (sp0 === 'hunt') { const ti = humans.findIndex(h => h.cid != null && h.cid === o.huntTarget); humans.forEach((h, i) => { h.team = i === ti ? 0 : 1; if (h.team === 1) h.model = huntModel(this.rng, h.model ?? 0); }); }
+    for (const h of humans) { const team = h.team ?? (counts[0] <= counts[1] ? 0 : 1); const sp = this.map.spawns[team][counts[team] % 10]; counts[team]++; this.makeTank({ x: sp[0], y: sp[1], team, name: h.name, cc: h.cc, skin: h.skin, weapon: h.weapon, lv: h.lv, human: true, tlv: h.tlv, tmod: h.tmod, rki: h.rki, extraLives: h.extraLives, tur: h.tur, buy: h.buy, ib: h.ib, cid: h.cid, model: h.model, a: team ? Math.PI : 0, inv: 3 }); }
+    const perT = sp0 === 'hunt' ? [1, 5] : sp0 === 'survival' || sp0 === 'zombie' ? [Math.max(counts[0], o.allies ?? 0), 0] : sp0 === 'boss' ? [Math.max(counts[0], 4), 0] : o.noBots ? [counts[0], counts[1]] : [per, per];
+    for (let team = 0; team < 2; team++) while (counts[team] < perT[team]) { const k = counts[team], sp = this.map.spawns[team][k % 10], off = Math.floor(k / 10) * 16 * (team ? -1 : 1); counts[team]++; this.makeTank({ x: sp[0] + off, y: sp[1], team, name: names[ni++ % names.length], skin: 'team', weapon: this.rng() < 0.55 ? 'cannon' : this.rng.pick(WEAPON_LIST), lv: this.botLv(this.opts.botLevel ?? 2), skill: this.botSkill(), a: team ? Math.PI : 0, inv: 3, hp: 100, model: sp0 === 'hunt' && team === 1 ? huntModel(this.rng) : undefined }); }
+    if (sp0 === 'hunt') this.initHunt();
     if (sp0 === 'moba') initMoba(this);
     if (sp0 === 'sniper') for (const t of this.tanks) { t.weapon = 'rail'; t.baseW = 'rail'; t.baseWeapon = 'rail'; t.ammo = null; }
     if (sp0 === 'boss') { const sp = this.map.spawns[1][2]; const hpM = this.diff.hp || 1; this.boss = this.makeTank({ x: sp[0] - 30, y: sp[1], team: 1, name: 'Босс «Мамонт»', skin: 'enemy_a', weapon: 'rocket', hp: Math.round(2600 * hpM), speed: 52, dmgMul: 1.6, skill: 0.85, a: Math.PI, inv: 0 }); this.boss.isBoss = true; this.boss.ammo = null;
       for (let k = 0; k < 3; k++) this.spawnWaveBot(false); }
   }
+  initHunt() { const o = this.opts; this.timeLimit = o.timeLimit || HUNT.time; this.huntHold = o.huntHold ?? HUNT.hold; this.target = 1e9;
+    for (const t of this.tanks) { t.noBuy = true; if (t.team === 0) { t.isTarget = true; if (!t.human) { const M0 = t.model >= 0 ? modelOf(t.model) : null, nid = HUNT_TGT[this.seed % HUNT_TGT.length], Mn = modelOf(nid), RK = (M) => M.hp * (this.opts.equal ? 1 : RAR_K[M.rar] || 1); t.maxHp = Math.round(t.maxHp / (M0 ? RK(M0) : 1) * RK(Mn)); t.speed = t.speed / (M0 ? M0.spd : 1) * Mn.spd; t.armMul = Mn.arm; t.relMul = Mn.rel; t.model = nid; } t.lives = HUNT.tLives; t.infAmmo = true; t.hk = htKit(); t.maxHp = Math.round(t.maxHp * HUNT.hpMul); t.hp = t.maxHp; t.speed *= HUNT.spdMul; this.huntT = t; const sp = this.map.spawns[0][Math.floor(this.rng() * this.map.spawns[0].length)]; t.x = sp[0]; t.y = sp[1]; if (t.ammo != null) t.ammo = null; }
+      else t.lives = HUNT.hLives; }
+    this.huntSeen = null; this.huntSwapN = 0; }
+  huntSwap(t) { // r36: after every lost life the target comes back in a different strong tank (its own class look; unlimited ammo / traps kept)
+    const cur = t.model, list = HUNT_TGT.filter(id => id !== cur); if (!list.length) return; const nid = list[(this.huntSwapN++ * 3 + (this.seed % 5)) % list.length], Mo = cur >= 0 ? modelOf(cur) : null, Mn = modelOf(nid), RK = (M) => M.hp * (this.opts.equal ? 1 : RAR_K[M.rar] || 1);
+    t.maxHp = Math.round(t.maxHp / (Mo ? RK(Mo) : 1) * RK(Mn)); t.hp = t.maxHp; t.speed = t.speed / (Mo ? Mo.spd : 1) * Mn.spd; t.armMul = Mn.arm; t.relMul = Mn.rel; t.model = Mn.id; this.ev({ k: 'htank', id: t.id, model: Mn.id, x: t.x, y: t.y }); }
+  huntSpot(t) { // target respawn: open tile far from every living hunter, preferably in grass or a house
+    let best = null, bs = -1; for (let k = 0; k < 60; k++) { const x = 30 + this.rng() * (this.map.pw - 60), y = 30 + this.rng() * (this.map.ph - 60); if (this.map.tankBlockedAt(x, y, TANK_R + 3)) continue; const v = this.map.get(Math.floor(x / CELL), Math.floor(y / CELL)); if (v === T_WATER || v === T_SWAMP) continue;
+      let dm = 1e9; for (const h of this.tanks) if (h.team !== t.team && h.alive) dm = Math.min(dm, Math.hypot(h.x - x, h.y - y)); const sc = Math.min(dm, 500) + (v === T_BUSH ? 60 : 0); if (sc > bs) { bs = sc; best = [x, y]; } }
+    return best; }
   initClassic(level) {
     const o = this.opts; this.level = level; this.map = genClassic(level); this.lives = o.lives ?? 3; this.score = o.score || 0;
     const L = CLASSIC_LEVELS[level % CLASSIC_LEVELS.length], loop = Math.floor(level / CLASSIC_LEVELS.length);
@@ -257,7 +285,7 @@ export class World {
     this.queue.sort(() => this.rng() - 0.5); this.enemyTotal = this.queue.length; this.enemyKilled = 0; this.spawnTimer = 1; this.spawnIdx = 0;
     this.freezeT = 0; this.shovelT = 0; this.loopBonus = loop; this.baseAlive = true; this.killsByType = { b: 0, f: 0, p: 0, a: 0 };
     const humans = o.players || [];
-    humans.forEach((h, i) => { const sp = this.map.spawns[i % 2]; this.makeTank({ x: sp[0], y: sp[1], team: 0, name: h.name, cc: h.cc, skin: h.skin, weapon: h.weapon, lv: h.lv, human: true, tlv: h.tlv, rki: h.rki, extraLives: h.extraLives, tur: h.tur, buy: h.buy, ib: h.ib, cid: h.cid, model: h.model, a: -Math.PI / 2, inv: 3, hp: 100 }); });
+    humans.forEach((h, i) => { const sp = this.map.spawns[i % 2]; this.makeTank({ x: sp[0], y: sp[1], team: 0, name: h.name, cc: h.cc, skin: h.skin, weapon: h.weapon, lv: h.lv, human: true, tlv: h.tlv, tmod: h.tmod, rki: h.rki, extraLives: h.extraLives, tur: h.tur, buy: h.buy, ib: h.ib, cid: h.cid, model: h.model, a: -Math.PI / 2, inv: 3, hp: 100 }); });
     this.spawnPoints = this.map.enemySpawns;
   }
   spawnClassicEnemy() {
@@ -359,7 +387,7 @@ export class World {
     this.beaconStep();
     this.separate();
     this.rebuildHash();
-    this.stepBullets(dt);
+    this.stepBullets(dt); if (this.molos || this.fires) mlStep(this, dt);
     this.stepPickups(dt); if (this.mode !== 'classic') this.stepItems(dt);
     if (this.mode === 'br') this.stepZone(dt); else if (this.mode === 'team') this.stepTeam(dt); else this.stepClassic(dt);
   }
@@ -377,29 +405,31 @@ export class World {
     t.cd -= dt;
     if (t.shBMax) { if (t.shBT > 0) t.shBT -= dt; else if (t.shBHp < t.shBMax) t.shBHp = Math.min(t.shBMax, t.shBHp + t.shBMax * 0.15 * dt); } if (t.apsMax && t.apsN < t.apsMax) { t.apsR = (t.apsR || 0) + dt; if (t.apsR > 30) { t.apsR = 0; t.apsN++; } } if (t.fx && t.fx.ext && t.burnT > 0) t.burnT -= dt * t.fx.ext * 2; // r27
     if (t.invisT > 0) t.invisT -= dt; if (t.invisCd > 0) t.invisCd -= dt; if (t.revealI > 0) t.revealI -= dt; t.cloaked = t.invisT > 0 && !(t.revealI > 0);
-    const inp = t.input; const frozen = (this.mode === 'classic' && t.team === 1 && this.freezeT > 0);
-    let mx = frozen ? 0 : inp.mx, my = frozen ? 0 : inp.my; const mag = Math.hypot(mx, my);
+    const inp = t.input; const frozen = (this.mode === 'classic' && t.team === 1 && this.freezeT > 0) || (this.special === 'hunt' && t.team === 1 && this.time < this.huntHold);
+    const rooted = frozen || t.snareT > 0; let mx = rooted ? 0 : inp.mx, my = rooted ? 0 : inp.my; const mag = Math.hypot(mx, my);
     if (mag > 1) { mx /= mag; my /= mag; }
     if (t.ai && t.alive && t.rkT && t.rkA && t.ai.target && this.rng() < dt * 0.5) { const tg = this.byId.get(t.ai.target); if (tg && tg.alive && Math.hypot(tg.x - t.x, tg.y - t.y) < 230) this.fireRocket(t); }
     if (t.fx && t.alive) { const F = t.fx; if (F.regen && t.hp < t.maxHp) t.hp = Math.min(t.maxHp, t.hp + F.regen * dt * (this.opts.hpMul ?? HP_MUL) / 3); if (F.shieldRegen && this.time - (t.lastHurt ?? -99) > 5 && (t.shield || 0) < 30) t.shield = (t.shield || 0) + 4 * dt; if (F.empImm) t.empT = 0; }
     if (t.eq && t.alive) { const E = t.eq; if (E.includes('ext') && t.burnT > 0) t.burnT -= dt * 2; const q = this.time - (t.lastHurt ?? -99); if (E.includes('repair') && q > 4 && t.hp < t.maxHp) t.hp = Math.min(t.maxHp, t.hp + t.maxHp * 0.02 * dt); if (E.includes('shieldg') && q > 8 && (t.shield || 0) < t.maxHp * 0.15) t.shield = Math.min(t.maxHp * 0.15, (t.shield || 0) + t.maxHp * 0.03 * dt); }
-    if (t.slowT > 0) t.slowT -= dt; if (t.empT > 0) t.empT -= dt; if (t.stunT > 0) t.stunT -= dt;
+    if (t.slowT > 0) t.slowT -= dt; if (t.snareT > 0) t.snareT -= dt; if (t.empT > 0) t.empT -= dt; if (t.stunT > 0) t.stunT -= dt;
     if (t.burnT > 0) { t.burnT -= dt; t.burnAcc = (t.burnAcc || 0) + dt; if (t.burnAcc >= 0.5) { t.burnAcc = 0; this.damage(t, 1.5 * (this.opts.hpMul ?? HP_MUL), t.burnBy || 0, 'burn', t.x, t.y); if (!t.alive) return; } }
     const pd = t.pd || (t.pd = [1, 1, 1, 1, 1]); t.pbroke = (pd[0] <= 0 ? 1 : 0) | (pd[1] <= 0 ? 2 : 0) | (pd[2] <= 0 ? 4 : 0) | (pd[3] <= 0 ? 8 : 0) | (pd[4] <= 0 ? 16 : 0); // persistent, no auto-heal
     if (t.stunT > 0 && t.input) { t.input.mx += (this.rng() - 0.5) * 0.9; t.input.my += (this.rng() - 0.5) * 0.9; } // crew stun: control shake
     if (t.regenT > 0) { t.regenT -= dt; t.hp = Math.min(t.maxHp, t.hp + t.regenR * dt); }
     if (t.armorK === 3 && t.armorT && t.armorHp < armorMax(t.armorT)) t.armorHp = Math.min(armorMax(t.armorT), t.armorHp + 2.5 * dt);
-    const sp = t.speed * (1 + UPGRADES.engine.per * t.lv.engine) * (t.speedT > 0 ? 1.45 : 1) * (t.slowT > 0 ? 0.45 : 1) * (t.pbroke & 4 ? 0.38 : 1) * (t.pbroke & 8 ? 0.78 : 1) * (this.mode === 'classic' ? 1 : 1 - (0.2 * (t.lk = loadK(t)) + 0.55 * t.lk ** 3)) /* r25: progressive — light load mild, very heavy load strong */; // r19 weight; broken tracks: ~38% speed
+    const sp = (this.map.hgt ? slopeK(this.map, t.x, t.y, t.a, (t.input && (t.input.mx * Math.cos(t.a) + t.input.my * Math.sin(t.a)) < 0) ? -1 : 1) : 1) * t.speed * (1 + UPGRADES.engine.per * t.lv.engine) * (t.speedT > 0 ? 1.45 : 1) * (t.slowT > 0 ? 0.45 : 1) * (t.crushT > 0 ? 1 - t.crushT : 1) * (t.stuckT > 0 ? 0.15 : 1) * (t.pbroke & 4 ? 0.38 : 1) * (t.pbroke & 8 ? 0.78 : 1) * (this.mode === 'classic' ? 1 : 1 - (0.2 * (t.lk = loadK(t)) + 0.55 * t.lk ** 3)) /* r25: progressive — light load mild, very heavy load strong */; // r19 weight; broken tracks: ~38% speed
     const cell = this.map.get(Math.floor(t.x / CELL), Math.floor(t.y / CELL)); const ice = cell === T_ICE;
-    const tk = (t.sub ? 0.25 : 1) * (cell === T_SWAMP ? Math.min(1, SWAMP_SPD + ((t.fx && t.fx.mudRes) || 0)) : cell === T_MUD ? Math.min(1, MUD_SPD + ((t.fx && t.fx.mudRes) || 0)) : cell === T_WATER ? Math.min(1, WATER_SPD + ((t.fx && t.fx.amph) || 0)) : 1); // r27 wide tracks / winch / amphibious kit // r25 water ford; submerged: ~25% of normal
+    const tk = (t.sub ? 0.25 : 1) * (cell === T_SWAMP ? Math.min(1, SWAMP_SPD + ((t.fx && t.fx.mudRes) || 0)) : cell === T_MUD ? Math.min(1, MUD_SPD + ((t.fx && t.fx.mudRes) || 0)) : cell === T_WATER ? Math.min(1, WATER_SPD + ((t.fx && t.fx.amph) || 0)) : cell === T_TRENCH ? Math.min(1, TRENCH_SPD + ((t.fx && t.fx.mudRes) || 0)) : 1); // r27 wide tracks / winch / amphibious kit // r25 water ford; submerged: ~25% of normal
     const tvx = mx * sp * tk, tvy = my * sp * tk, k = ice ? 1 - Math.exp(-dt * 2.2) : 1 - Math.exp(-dt * 18 * (t.accMul || 1)); // extra guns = heavier = slower to accelerate
     t.vx += (tvx - t.vx) * k; t.vy += (tvy - t.vy) * k;
     if (mag > 0.15) { const want = Math.atan2(my, mx); const d = angDiff(t.a, want); t.a += Math.sign(d) * Math.min(Math.abs(d), dt * 11 * Math.min(1, 0.15 + Math.abs(d) * 1.3)); } // r23: eased (slows into the target angle, no snap)
     this.moveTank(t, t.vx * dt, t.vy * dt);
     t.tread += Math.hypot(t.vx, t.vy) * dt;
+    if (this.map.crush) { if (t.crushT > 0) t.crushT = Math.max(0, t.crushT - dt * 1.6); if (t.stuckT > 0) t.stuckT -= dt; crushTank(this, t); // r37 «Траншеи»: houses/fences/trees fall under the tracks
+      const inTr = cell === T_TRENCH; if (inTr && !t.inTr && Math.hypot(t.vx, t.vy) > 40 && this.time > (t.stuckCd || 0) && this.rng() < 0.3) { t.stuckT = 0.7 + this.rng() * 0.9; t.stuckCd = this.time + 5; if (t.human) this.ev({ k: 'note', id: t.id, txt: 'Застрял в траншее! Газуй…' }); this.ev({ k: 'dust', x: t.x, y: t.y }); } t.inTr = inTr ? 1 : 0; }
     { const m = this.map, q = TANK_R * 0.7, at = (x, y) => m.get(Math.floor(x / CELL), Math.floor(y / CELL));
       const c0 = at(t.x, t.y), full = c0 === T_SWAMP && at(t.x - q, t.y - q) === T_SWAMP && at(t.x + q, t.y - q) === T_SWAMP && at(t.x - q, t.y + q) === T_SWAMP && at(t.x + q, t.y + q) === T_SWAMP;
-      t.terr = full ? 2 : c0 === T_SWAMP ? 3 : c0 === T_MUD ? 1 : 0; // 2 = fully in swamp (hidden), 3 = swamp edge, 1 = mud
+      t.terr = full ? 2 : c0 === T_SWAMP ? 3 : c0 === T_MUD || c0 === T_TRENCH ? 1 : 0; // 2 = fully in swamp (hidden), 3 = swamp edge, 1 = mud
       t.inBush = c0 === T_BUSH || this.inSmoke(t.x, t.y) || full;
       // r25: water — 30 s safe, then armour then HP drain until the tank leaves; splash on entry, wake events while moving
       if (c0 === T_WATER && !t.sub) { if (!t.wIn) { t.wIn = 1; this.ev({ k: 'splash', id: t.id, x: t.x, y: t.y, s: Math.min(1, Math.hypot(t.vx, t.vy) / 60) }); } t.wT = (t.wT || 0) + dt;
@@ -408,7 +438,7 @@ export class World {
           if (t.armorT && t.armorHp > 0) { t.armorHp = Math.max(0, t.armorHp - 8 * k * (over > 15 ? 1.6 : 1)); if (t.armorHp <= 0) { t.armorT = 0; t.armorK = 0; this.ev({ k: 'armorBreak', id: t.id }); } }
           else this.damage(t, t.maxHp * rate * k * (t.armMul || 1), null, 'water', t.x, t.y); } } }
       else { if (t.wIn) { t.wIn = 0; this.ev({ k: 'splash', id: t.id, x: t.x, y: t.y, s: 0.5 }); } if (t.wT) t.wT = Math.max(0, t.wT - dt * 3); }
-      t.seeR = full ? SWAMP_SEE : t.inBush ? BUSH_SEE : c0 === T_MUD ? MUD_SEE : 1e9;
+      t.seeR = full ? SWAMP_SEE : t.inBush ? BUSH_SEE : c0 === T_MUD ? MUD_SEE : c0 === T_TRENCH ? TRENCH_SEE : 1e9;
       if (t.surfT > 0) t.surfT -= dt; if (t.diveCd > 0) t.diveCd -= dt;
       if (t.sub) { t.oxy -= dt; t.inBush = true; t.seeR = DIVE_SEE; if (!full || t.oxy <= 0) { this.surface(t); if (t.oxy <= 0) t.diveCd = DIVE_CD; } }
       else if ((t.oxy ?? DIVE_MAX) < DIVE_MAX) t.oxy = Math.min(DIVE_MAX, (t.oxy ?? DIVE_MAX) + dt * 1.5);
@@ -493,6 +523,8 @@ export class World {
   doAction(t, act) {
     if (act === 'buylife') { if (t.alive || !t.waitBuy || !t.human) return; t.lives = 1 + Math.min(3, (t.lifeBuys = (t.lifeBuys || 0) + 1) > 3 ? 0 : 1); t.waitBuy = false; t.respawnT = 0.6; this.ev({ k: 'life', id: t.id, n: t.lives, buy: 1 }); return true; } // r26: «Купить жизнь» on the death screen (coins are charged client-side)
     if (!t.alive || t.spawnT > 0) return;
+    if (act === 'molotov' || act.startsWith('molotov_')) return mlThrow(this, t, act.length > 8 ? +act.slice(8) || undefined : undefined);
+    if (act.startsWith('ht_')) return this.special === 'hunt' && htUse(this, t, act.slice(3));
     if (act === 'blocks') { if (!(t.blocksN > 0) || this.mode === 'classic') return; const m = this.map, a = t.ta ?? t.a ?? 0, cs = Math.cos(a), sn = Math.sin(a); let n = 0;
       for (let d = 0; d < 2; d++) for (let k = -2; k <= 2; k++) { const x = t.x + cs * (20 + d * CELL) - sn * k * CELL, y = t.y + sn * (20 + d * CELL) + cs * k * CELL, c = Math.floor(x / CELL), r = Math.floor(y / CELL); if (c < 1 || r < 1 || c >= m.w - 1 || r >= m.h - 1) continue; const v = m.get(c, r); if (v !== T_EMPTY && v !== T_ICE && v !== T_MUD) continue;
         if (this.tanks.some(o => o.alive && Math.abs(o.x - (c * CELL + 4)) < TANK_R + 4 && Math.abs(o.y - (r * CELL + 4)) < TANK_R + 4)) continue; m.set(c, r, 11); m.hp[r * m.w + c] = 1; n++; }
@@ -589,13 +621,13 @@ export class World {
     else if (t.ai) reload *= 1.35;
     if (t.slowT > 0) reload *= 1.6; if (t.pbroke & 2) reload *= 1.6; reload *= t.relMul || 1;
     if (t.shA && !t.human && (!t.shPick || this.time - t.shPick > 1.2)) { t.shPick = this.time; const tg = t.ai && t.ai.target ? this.byId.get(t.ai.target) : null; if (this.rng() < 0.35 + (t.ai ? t.ai.skill : 0.5) * 0.6) t.shT = pickShell(this, t, tg); }
-    const SH = t.shA && t.ammo == null && t.shT ? SHELLS[t.shT] : (t.shA && t.ammo == null ? SHELLS[0] : null); if (SH && SH.id !== 'ap') { t.shA[t.shT]--; if (t.shA[t.shT] <= 0) { t.shT = 0; this.ev({ k: 'shellout', id: t.id }); } }
+    const SH = t.shA && t.ammo == null && t.shT ? SHELLS[t.shT] : (t.shA && t.ammo == null ? SHELLS[0] : null); if (SH && SH.id !== 'ap' && !t.infAmmo) { t.shA[t.shT]--; if (t.shA[t.shT] <= 0) { t.shT = 0; this.ev({ k: 'shellout', id: t.id }); } }
     if (t.wv && t.ammo != null) { reload *= t.wv.rel || 1; } if (t.fx) { if (t.fx.lowHpRel && t.hp < t.maxHp * 0.35) reload *= t.fx.lowHpRel; if (t.fx.ammoSave && t.ammo != null && this.rng() < t.fx.ammoSave) t.ammo++; }
     if (w.burst > 1) { t.bc = (t.bc || 0) + 1; reload *= t.bc % w.burst ? 0.55 : w.burst * 0.9; } /* r20: MG bursts */
     t.cd = reload; t.lastFire = this.time; t.recoil = 1; if (t.invisT > 0) t.revealI = 0.6; /* r26: firing reveals */
     const dmgBase = w.dmg * (1 + UPGRADES.dmg.per * t.lv.dmg) * t.dmgMul * (t.powerT > 0 ? 1.35 : 1) * (this.mode === 'classic' ? 1 : tierMul(t.wtier)) * (md & 2 ? 1.15 : 1) * (t.wv && t.ammo != null ? t.wv.dmg || 1 : 1) * (w.slots ? 1 + 0.06 * Math.min(w.slots, bitsN((t.mods || 0) & 15) + (t.modN || 0)) : 1); /* r20: MG mod slots */
-    if (t.ammo != null && this.mode !== 'classic') { t.ammo--; if (t.ammo <= 0) { this.ev({ k: 'noammo', id: t.id, w: t.weapon }); t.outOfAmmo = true; } }
-    else if (t.ammo == null && t.shells != null) t.shells--;
+    if (t.ammo != null && this.mode !== 'classic' && !t.infAmmo) { t.ammo--; if (t.ammo <= 0) { this.ev({ k: 'noammo', id: t.id, w: t.weapon }); t.outOfAmmo = true; } }
+    else if (t.ammo == null && t.shells != null && !t.infAmmo) t.shells--;
     const count = (this.mode === 'classic' && t.stars >= 2 && t.weapon === 'cannon') ? 2 : w.count;
     const steel = w.steel || (this.mode === 'classic' && t.stars >= 3);
     const spd = (t.wv && t.ammo != null ? t.wv.spd || 1 : 1) * w.speed * t.bulletMul * (this.mode === 'classic' && t.stars >= 1 && t.team === 0 ? 1.3 : 1);
@@ -606,7 +638,8 @@ export class World {
       const bx = t.x + cs * 11 - sn * off, by = t.y + sn * 11 + cs * off;
       this.bullets.push({ id: this.id(), x: bx, y: by, px: bx, py: by, vx: Math.cos(a) * spd, vy: Math.sin(a) * spd, dmg: dmgBase, owner: t.id, team: t.team, life: w.life * (this.mode === 'classic' ? 1.6 : 1) * (md & 1 ? 1.3 : 1), w: w.id, lob: !!w.lob, cluster: w.cluster || 0, bounce: w.bounce || 0, freeze: w.freeze || 0, splash: w.splash, pierce: w.pierce, steel, brick: w.brick, homing: w.homing || 0, hit: null, delay: count > 1 && w.id === 'twin' ? 0 : 0 });
     }
-    if (SH) for (let i = this.bullets.length - count; i < this.bullets.length; i++) { const b = this.bullets[i]; if (!b) continue; b.sh = SHELL_IDX_OF(SH); b.dmg *= SH.dmg; if (SH.vsArm) b.vsArm = SH.vsArm; if (SH.spd) { b.vx *= SH.spd; b.vy *= SH.spd; } if (SH.splash && !b.splash) b.splash = SH.splash; if (SH.cluster) b.cluster = SH.cluster; if (SH.bounce) b.bounce = Math.max(b.bounce || 0, SH.bounce); if (SH.freeze) b.freeze = SH.freeze; if (SH.burn) b.burn = SH.burn; if (SH.emp) b.emp = SH.emp; if (SH.smoke) b.smk = 1; for (const k of ['reveal', 'acid', 'knock', 'pull', 'chain', 'pbreak']) if (SH[k]) b[k] = SH[k]; if (SH.homing) b.homing = SH.homing; if (SH.pierce) b.pierce = true; if (SH.brick) b.brick = SH.brick; if (SH.steel) b.steel = true; }
+    if (SH && SH.zap) this.ev({ k: 'zap', id: t.id, x: t.x, y: t.y, z: SH.zap });
+    if (SH) for (let i = this.bullets.length - count; i < this.bullets.length; i++) { const b = this.bullets[i]; if (!b) continue; b.sh = SHELL_IDX_OF(SH); b.dmg *= SH.dmg; if (SH.zap) b.zap = SH.zap; if (SH.vsArm) b.vsArm = SH.vsArm; if (SH.spd) { b.vx *= SH.spd; b.vy *= SH.spd; } if (SH.splash && !b.splash) b.splash = SH.splash; if (SH.cluster) b.cluster = SH.cluster; if (SH.bounce) b.bounce = Math.max(b.bounce || 0, SH.bounce); if (SH.freeze) b.freeze = SH.freeze; if (SH.burn) b.burn = SH.burn; if (SH.emp) b.emp = SH.emp; if (SH.smoke) b.smk = 1; for (const k of ['reveal', 'acid', 'knock', 'pull', 'chain', 'pbreak']) if (SH[k]) b[k] = SH[k]; if (SH.homing) b.homing = SH.homing; if (SH.pierce) b.pierce = true; if (SH.brick) b.brick = SH.brick; if (SH.steel) b.steel = true; }
     if (w.mgfx) for (let i = this.bullets.length - count; i < this.bullets.length; i++) if (this.bullets[i]) this.mgFx(this.bullets[i], w.mgfx);
     if (SH && SH.count && count === 1) for (let k = 1; k < SH.count; k++) { const b0 = this.bullets[this.bullets.length - 1], a = Math.atan2(b0.vy, b0.vx) + (k - SH.count / 2) * SH.spread / SH.count * 2, sp = Math.hypot(b0.vx, b0.vy); this.bullets.push({ ...b0, id: this.id(), vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, hit: null }); }
     if (t.outOfAmmo) { t.outOfAmmo = false; t.wv = null; t.mgi = null; t.weapon = t.baseW || 'cannon'; t.ammo = null; t.wtier = 1; }
@@ -618,10 +651,12 @@ export class World {
     const tmp = []; const m0 = this.map; let m = m0;
     for (let i = this.bullets.length - 1; i >= 0; i--) {
       const b = this.bullets[i]; b.life -= dt; b.px = b.x; b.py = b.y; m = b.layer && this.under ? this.under : m0; this.map = m; this._L = b.layer ? 1 : 0;
+      if (m.hgt && !b.lob && !b.arc) { const hh = hAt(m, b.x, b.y); if (b.z == null) b.z = hh + 5; else if (hh > b.z + 8) { this.ev({ k: 'dust', x: b.x, y: b.y }); this.bullets.splice(i, 1); continue; } } // r37: hill crest = cover
       if (!b.lob && this.wrecks && this.wrecks.length && b.owner !== -9 && this.bulletHitsWreck(b)) { this.bullets.splice(i, 1); continue; }
       if (this.traps.length && !b.twin) { let hitT = null; for (const T of this.traps) if (T.team !== b.team && (b.x - T.x) ** 2 + (b.y - T.y) ** 2 < 49) { hitT = T; break; } if (hitT) { hitT.hp -= b.dmg; this.ev({ k: 'hit', x: b.x, y: b.y }); this.bullets.splice(i, 1); continue; } } // r25: deployed rocket traps can be shot
       if (b.twin) { let hit = -1; for (let j = 0; j < this.bullets.length; j++) { const o = this.bullets[j]; if (o !== b && o.team !== b.team && !o.lob && (o.x - b.x) ** 2 + (o.y - b.y) ** 2 < 36) { hit = j; break; } } if (hit >= 0) { const o = this.bullets[hit]; b.rhp -= o.dmg; if (!o.twin) { this.bullets.splice(hit, 1); if (hit < i) i--; } if (b.rhp <= 0) { this.ev({ k: 'boom', x: b.x, y: b.y, s: 0.5, w: 'rocket' }); this.bullets.splice(i, 1); continue; } } } // r25: twin rockets in flight can be shot down
       if (!b.lob && this.sentries && this.sentries.length && this.bulletHitsSentry(b)) { this.bullets.splice(i, 1); continue; }
+      if (!b.lob && this.htraps && this.htraps.length && htBullet(this, b)) { this.bullets.splice(i, 1); continue; }
       if (b.lockR) { // pack rocket: chase only while the target stays inside the lock radius and visible
         let tg = b.lock ? this.byId.get(b.lock) : null;
         if (tg && (!tg.alive || (tg.inBush && !this.revealedTo(tg, b.team)) || (tg.x - b.x) ** 2 + (tg.y - b.y) ** 2 > b.lockR * b.lockR)) { tg = null; b.lock = 0; }
@@ -687,6 +722,7 @@ export class World {
       if (tv === T_BRICK) { const i = r * m.w + c; m.hp[i] -= power; hitSomething = true; if (m.hp[i] <= 0.001) { m.set(c, r, T_EMPTY); this.ev({ k: 'brick', x: cx, y: cy }); } }
       else if (tv === T_STEEL && b.steel && !m.hard && c > 1 && r > 1 && c < m.w - 2 && r < m.h - 2) { m.set(c, r, T_EMPTY); this.ev({ k: 'brick', x: cx, y: cy, steel: 1 }); hitSomething = true; }
       else if (tv === 11) { if (b.w === 'rocket' || b.w === 'hrocket' || b.rk) { const i = r * m.w + c; m.hp[i] = (m.hp[i] || 1) - 0.5; hitSomething = true; if (m.hp[i] <= 0.001) { m.set(c, r, T_EMPTY); this.ev({ k: 'brick', x: cx, y: cy, steel: 1 }); } } }
+      else if (tv === T_HOUSE || tv === T_TREE) { const i = r * m.w + c; m.hp[i] -= Math.max(0.25, power || 0.5) * (tv === T_TREE ? 1.2 : 0.3); hitSomething = true; if (m.hp[i] <= 0.001) collapse(this, c, r, b.a ?? Math.atan2(b.vy || 0, b.vx || 1), tv === T_HOUSE ? 1 : 0); }
       else if (tv === T_CRATE) { const i = r * m.w + c; m.hp[i] -= b.dmg / 70; hitSomething = true; if (m.hp[i] <= 0) this.breakCrate(c, r); }
     }
     this.ev({ k: 'hit', x, y, s: v === T_STEEL ? 2 : 1, w: b.w });
@@ -704,9 +740,12 @@ export class World {
     const r = this.rng(); let type, wid = null, tier = 1;
     if (!forceWeapon && this.rng() < 0.5) { const lid = rollLootX(this.rng); this.pickups.push({ id: this.id(), x, y, type: 'lx', lid, wid: null, tier: LOOTX[lid].r, t: 0, life: this.mode === 'team' ? 30 : 999 }); return; }
     if (forceWeapon === 'beacon') { this.pickups.push({ id: this.id(), x, y, type: 'beacon', wid: null, tier: 5, t: 0, life: 9999 }); return; }
+    if (!forceWeapon && this.rng() < 0.021) { const tier = this.rollTier(); this.pickups.push({ id: this.id(), x, y, type: 'armor', wid: null, tier, ak: this.rng() < 0.45 ? 1 + Math.floor(this.rng() * 4) : 0, t: 0, life: this.mode === 'team' ? 25 : 999 }); return; } // r36: +30% armour crates on every map/mode
+    if (!forceWeapon && this.rng() < 0.05) { const q = this.rng(), zk = q < 0.65 ? 'lw' : q < 0.92 ? 'lb' : 'lr'; this.pickups.push({ id: this.id(), x, y, type: 'zap', zk, wid: null, tier: zk === 'lw' ? 1 : zk === 'lb' ? 4 : 5, t: 0, life: this.mode === 'team' ? 30 : 999 }); return; } // r36 «Ящик с молниями» on every map/mode
+    if (!forceWeapon && this.rng() < 0.055) { this.pickups.push({ id: this.id(), x, y, type: 'fire', wid: null, tier: 3, t: 0, life: this.mode === 'team' ? 30 : 999 }); return; } // r36 «Ящик с огнём» on every map
     if (forceWeapon) { type = 'weapon'; wid = forceWeapon; tier = forceTier || this.rollTier(); }
     else if (r < 0.07) type = 'hrocket'; else if (r < 0.1215 && r >= 0.12 && this.mode === 'br') type = 'beacon'; else if (r < 0.135 && r >= 0.12) type = 'radar'; else if (r < 0.12) type = 'part_' + PARTS[Math.floor(this.rng() * 5)]; else if (r < 0.2) { const q = this.rng(); type = q < 0.4 ? 'med' : q < 0.65 ? 'med_s' : q < 0.8 ? 'med_l' : q < 0.92 ? 'repair' : 'med_team'; } else if (r < 0.3) type = 'shield'; else if (r < 0.37) type = 'speed'; else if (r < 0.44) type = 'power';
-    else if (r < 0.53 && this.mode !== 'classic') { const lid = rollGear(this.rng); this.pickups.push({ id: this.id(), x, y, type: 'lx', lid, wid: null, tier: LOOTX[lid].r, t: 0, life: this.mode === 'team' ? 30 : 999 }); return; }
+    else if (r < 0.53 && this.mode !== 'classic') { const lid = rollFmod(this.rng); this.pickups.push({ id: this.id(), x, y, type: 'lx', lid, wid: null, tier: LOOTX[lid].r, t: 0, life: this.mode === 'team' ? 30 : 999 }); return; }
     else if (r < 0.58) { type = 'armor'; tier = this.rollTier(); } else if (r < 0.68) type = 'ammo'; else if (r < 0.735) type = 'smoke'; else if (r < 0.75) { const q = Math.random(); type = q < 0.6 ? 'drone' : q < 0.72 ? 'ldrone' : q < 0.85 ? 'twinr' : 'invis'; if (type === 'invis') tier = this.rollTier(); } else if (r < 0.82) type = 'mine';
     else if (r < 0.87 && this.mode === 'br') type = this.rng.pick(Object.keys(MODS));
     else { type = 'weapon'; wid = this.rng.pick(LOOT_WEAPONS); tier = this.rollTier(); }
@@ -734,6 +773,7 @@ export class World {
   damage(t, amount, ownerId, w, x, y) {
     if (!t.alive) return;
     if (t.inv > 0) { this.ev({ k: 'hit', x, y, s: 3 }); return; }
+    if (t.inTr && ownerId && w !== 'zone' && w !== 'water' && w !== 'fire') { const o = this.byId.get(ownerId); if (o && (o.x - t.x) ** 2 + (o.y - t.y) ** 2 > 70 * 70) amount *= 0.65; } // r37: trench = cover
     if (w !== 'zone' && w !== 'hrocket' && w !== 'thorns' && w !== 'twinr') amount *= DMG_BASE; // r26: +30% base damage for every weapon (cannon, MG, rockets, turrets, drones…) for everyone
     // r26: NO hidden player-vs-bot multipliers — damage depends only on weapon, upgrades, gear tier/level, mods and hit angle (same rules for everyone)
     if (this.mode === 'classic' && t.team === 1 && w === 'zone') return;
@@ -813,7 +853,7 @@ export class World {
       if (t.wave) { t.respawnT = 0; if (this.rng() < 0.3) this.dropLoot(t.x, t.y); return; }
       if ((sp === 'survival' || sp === 'zombie') && t.human) { this.lives--; if (this.lives <= 0) { t.respawnT = 0; if (!this.tanks.some(o => o.human && o.alive)) this.finish({ winnerTeam: 1, wave: this.wave }); return; } }
       if (sp === 'moba') { if (killer && killer.team !== t.team) this.gold[killer.team] += 25; t.respawnT = mobaRespawn(this) * (this.time >= 1200 ? 1.5 : 1); return; }
-      t.respawnT = sp === 'ctf' ? 5 : 3; if (this.rng() < 0.35) this.dropLoot(t.x, t.y);
+      t.respawnT = sp === 'ctf' ? 5 : sp === 'hunt' ? (t.isTarget ? 4 : 5) : 3; if (this.rng() < 0.35) this.dropLoot(t.x, t.y);
       if (this.score[0] >= this.target || this.score[1] >= this.target) this.finish({ winnerTeam: this.score[0] >= this.target ? 0 : 1 }); else this.lifeGate(t);
     } else {
       if (t.team === 1) {
@@ -856,7 +896,7 @@ export class World {
     t.wave = true; t.ammo = null; if (zombie) t.zombie = true; return t;
   }
   pruneWave() { if (!this.tanks.some(t => t.wave && !t.alive)) return; this.tanks = this.tanks.filter(t => { if (t.alive || !t.wave) return true; this.byId.delete(t.id); return false; }); }
-  stepSpecial(dt) {
+  stepSpecial(dt) { if (this.special === 'hunt') { htStep(this, dt); return; }
     const sp = this.special;
     if (sp === 'survival' || sp === 'zombie') {
       this.pruneWave();
@@ -876,7 +916,7 @@ export class World {
     const o = this.opts, m = this.map, total = Math.max(o.total || 8, humans.length), grid = m.spawns[0]; this.laps = o.laps || 3; this.score = [0, 0];
     const names = (this.opts.botNames || []).concat(BOT_NAMES.slice().sort(() => this.rng() - 0.5)); let i = 0;
     const mk = (extra) => { const [x, y] = grid[i % grid.length]; const t = this.makeTank({ x, y, team: 10 + i, a: -Math.PI / 2, inv: 4, ...extra }); t.cp = 1; t.lap = 0; t.cpPass = 0; i++; return t; };
-    for (const h of humans) mk({ name: h.name, cc: h.cc, skin: h.skin, weapon: h.weapon, lv: h.lv, human: true, tlv: h.tlv, rki: h.rki, extraLives: h.extraLives, cid: h.cid });
+    for (const h of humans) mk({ name: h.name, cc: h.cc, skin: h.skin, weapon: h.weapon, lv: h.lv, human: true, tlv: h.tlv, tmod: h.tmod, rki: h.rki, extraLives: h.extraLives, cid: h.cid });
     while (i < total) mk({ name: names[i % names.length], skin: this.rng.pick(BOT_SKINS), weapon: this.rng() < 0.6 ? 'cannon' : this.rng.pick(['twin', 'mg', 'rocket']), lv: this.botLv(), skill: this.botSkill(), speed: 70 + this.rng() * 6, hp: 100 });
   }
   raceProgress(t) { const cps = this.map.checkpoints, N = cps.length, prev = (t.cp - 1 + N) % N, c = cps[t.cp]; return t.lap * N + prev + 1 - Math.min(1, Math.hypot(c[0] - t.x, c[1] - t.y) / 400); }
@@ -903,10 +943,11 @@ export class World {
   respawnTeam(t) { t.layer = 0; t.rvg = null; if (this.wrecks) for (const k of this.wrecks) if (k.tid === t.id) k.tid = 0;
     if (this.special === 'race') { const cps = this.map.checkpoints, N = cps.length, a = cps[(t.cp - 1 + N) % N], b = cps[t.cp]; let x = a[0], y = a[1]; for (let k = 0; k < 20; k++) { const px = a[0] + this.rng.range(-40, 40), py = a[1] + this.rng.range(-40, 40); if (!this.map.tankBlockedAt(px, py, TANK_R + 3)) { x = px; y = py; break; } }
       t.x = x; t.y = y; t.alive = true; t.hp = t.maxHp; t.inv = 2; t.a = t.ta = Math.atan2(b[1] - y, b[0] - x); t.vx = t.vy = 0; t.cd = 0.3; t.ammo = t.human ? null : (AMMO[t.weapon] ?? null); t.outOfAmmo = false; this.ev({ k: 'spawn', x, y }); return; }
-    const sp = this.map.spawns[t.team][Math.floor(this.rng() * 10)];
-    t.x = sp[0] + this.rng.range(-6, 6); t.y = sp[1] + this.rng.range(-8, 8); t.alive = true; t.hp = t.maxHp; t.shield = 0; this.equipSpawn(t); t.inv = 2.5; t.a = t.ta = t.team ? Math.PI : 0; t.vx = t.vy = 0; t.speedT = t.powerT = 0; t.cd = 0.3;
+    const sp = (this.special === 'hunt' && t.isTarget && this.huntSpot(t)) || this.map.spawns[t.team][Math.floor(this.rng() * 10)];
+    t.x = sp[0] + (t.isTarget ? 0 : this.rng.range(-6, 6)); t.y = sp[1] + (t.isTarget ? 0 : this.rng.range(-8, 8)); t.alive = true; t.hp = t.maxHp; t.shield = 0; this.equipSpawn(t); t.inv = 2.5; t.a = t.ta = t.team ? Math.PI : 0; t.vx = t.vy = 0; t.speedT = t.powerT = 0; t.cd = 0.3;
+    if (t.isTarget && this.special === 'hunt') this.huntSwap(t);
     if (t.human) t.weapon = t.baseWeapon || t.weapon;
-    t.ammo = t.human ? null : (AMMO[t.weapon] ?? null); t.wtier = 1; t.armorT = 0; t.armorK = 0; t.armorHp = 0; if (t.build) { t.weapon = t.baseW; if (t.buildAk >= 0) { t.armorT = 1; t.armorHp = armorMax(1); t.armorK = t.buildAk; } } t.slowT = 0; t.regenT = 0; t.hrockets = 0; t.radar = 0; t.beacons = 0; t.beaconT = 0; t.sub = 0; t.oxy = DIVE_MAX; t.surfT = 0; t.diveCd = 0; t.pd = [1, 1, 1, 1, 1]; t.burnT = 0; t.empT = 0; t.stunT = 0; t.mods = 0; t.meds = Math.min(t.meds, 1); t.outOfAmmo = false;
+    t.ammo = t.human || t.infAmmo ? null : (AMMO[t.weapon] ?? null); t.wtier = 1; t.armorT = 0; t.armorK = 0; t.armorHp = 0; if (t.build) { t.weapon = t.baseW; if (t.buildAk >= 0) { t.armorT = 1; t.armorHp = armorMax(1); t.armorK = t.buildAk; } } t.slowT = 0; t.regenT = 0; t.hrockets = 0; t.radar = 0; t.beacons = 0; t.beaconT = 0; t.sub = 0; t.oxy = DIVE_MAX; t.surfT = 0; t.diveCd = 0; t.pd = [1, 1, 1, 1, 1]; t.burnT = 0; t.empT = 0; t.stunT = 0; t.mods = 0; t.meds = Math.min(t.meds, 1); t.outOfAmmo = false;
     this.ev({ k: 'spawn', x: t.x, y: t.y });
   }
   respawnClassic(t) {
@@ -1008,6 +1049,8 @@ export class World {
         if (t.ammo == null) { if (t.shells == null || t.shells >= BR_SHELLS * 2) return false; t.shells = Math.min(BR_SHELLS * 2, t.shells + 50); return true; } t.ammo += Math.ceil((AMMO[t.weapon] || 10) * 0.6); return true;
       case 'smoke': case 'mine': if (t[p.type + 's'] >= ITEM_MAX[p.type]) return false; t[p.type + 's']++; return true;
       case 'twinr': { if ((t.twinN || 0) >= 2) return false; t.twinN = 2; return true; }
+      case 'zap': { const i = SHELL_IDX[p.zk || 'lw']; if (!t.shA) t.shA = SHELLS.map((S, j) => j ? 0 : -1); if ((t.shA[i] || 0) >= ZAP_N) return false; t.shA[i] = ZAP_N; t.shT = i; return true; } // r36 «Ящик с молниями»: 28 lightning rounds, auto-selected
+      case 'fire': { if ((t.molotovN || 0) >= ML_N) return false; t.molotovN = ML_N; return true; } // r36 «Ящик с огнём»
       case 'invis': { if ((t.invisN || 0) >= ITEM_MAX.invis) return false; t.invisN = (t.invisN || 0) + 1; t.invisTier = Math.max(t.invisTier || 1, p.tier || 1); return true; }
       case 'drone': case 'ldrone': { const k = p.type + 'sN'; if ((t[k] || 0) >= ITEM_MAX[p.type]) return false; t[k] = (t[k] || 0) + 1; return true; }
       case 'hrocket': if ((t.hrockets || 0) > 0) return false; t.hrockets = HROCKET_PACK; return true; // one pack max: new pack only when empty
@@ -1046,7 +1089,7 @@ export class World {
       for (const t of this.tanks) if (t.alive && Math.hypot(t.x - z.cx, t.y - z.cy) > z.r) { t.inv = 0; const s = t.shield; t.shield = 0; this.damage(t, z.dps * 0.5 * (this.opts.hpMul ?? HP_MUL), 0, 'zone', t.x, t.y); t.shield = s; }
     }
   }
-  stepTeam(dt) { if (this.special) this.stepSpecial(dt); if (this.result) return; if (this.time >= this.timeLimit) this.finish(this.special === 'race' ? { winner: this.raceRanking()[0].id, race: true, timeout: true } : { winnerTeam: this.special === 'boss' ? 1 : this.score[0] === this.score[1] ? -1 : (this.score[0] > this.score[1] ? 0 : 1), timeout: true }); }
+  stepTeam(dt) { if (this.special) this.stepSpecial(dt); if (this.result) return; if (this.time >= this.timeLimit) this.finish(this.special === 'race' ? { winner: this.raceRanking()[0].id, race: true, timeout: true } : { winnerTeam: this.special === 'boss' || this.special === 'hunt' ? (this.special === 'hunt' ? 0 : 1) : this.score[0] === this.score[1] ? -1 : (this.score[0] > this.score[1] ? 0 : 1), timeout: true }); }
   stepClassic(dt) {
     this.freezeT = Math.max(0, this.freezeT - dt);
     if (this.shovelT > 0) { this.shovelT -= dt; if (this.shovelT <= 0 && this.baseAlive) { classicRing(this.map, T_BRICK); this.markRing(); } }
