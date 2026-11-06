@@ -105,18 +105,22 @@ export class NetClient {
     this.tr = tr; const canRetry = () => /onrender\.com/.test(url) && Date.now() - this.wakeT0 < 90000;
     const retry = () => { tr.dead = true; tr.close(); if (this.tr === tr) this.tr = null; this.app.ui.toast('Сервер просыпается… подождите до минуты', 'globe'); this.retryT = setTimeout(() => { if (this.status === 'connecting') this.connect(url, attempt + 1); }, 2500); };
     const to = setTimeout(() => { if (this.status === 'connecting') { if (canRetry()) return retry(); this.set('error'); this.app.ui.toast('Сервер не отвечает', 'info'); tr.close(); } }, 12000);
-    tr.onOpen(() => { const p = this.app.playerCfg(); tr.send({ t: 'hello', v: PROTO, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, tmod: p.tmod, build: p.build, loadout: p.loadout, cc: p.cc }); });
+    tr.onOpen(() => { const p = this.app.playerCfg(); tr.send({ t: 'hello', v: PROTO, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, tlv: p.tlv, model: p.model, tmod: p.tmod, build: p.build, loadout: p.loadout, cc: p.cc }); });
     tr.onMessage((m) => {
-      if (m.t === 'welcome') { clearTimeout(to); this.players = m.players; this.set('online'); this.app.ui.toast('Подключено к серверу', 'globe'); }
+      if (m.t === 'welcome') { clearTimeout(to); this.players = m.players; this.set('online'); if (this._rjPending) { const tk = this._rjPending; this._rjPending = null; tr.send({ t: 'rejoin', token: tk }); return; } this.app.ui.toast('Подключено к серверу', 'globe'); }
       else if (m.t === 'lobby') { this.players = m.players; if (this.status === 'online') this.app.ui.setNetStatus(); }
       else if (m.t === 'queue') { this.status = 'queue'; this.showQueue(m); }
-      else if (m.t === 'start') { this.closeQueue(); this.status = 'online'; this.app.startSession(new RemoteSession(this.app, tr, m)); }
+      else if (m.t === 'rj') this.rejoinToken = m.token;
+      else if (m.t === 'start') { this._rj = 0; this.closeQueue(); this.status = 'online'; this.app.startSession(new RemoteSession(this.app, tr, m)); }
       else if (m.t === 'room') { this.room = m; this.app.ui.roomLobby(m); }
       else if (m.t === 'roomGone') { this.room = null; this.app.ui.closeRoom(); if (m.msg) this.app.ui.toast(m.msg, 'info'); }
       else if (m.t === 'roomChat') { this.app.ui.roomChatMsg(m); }
-      else if (m.t === 'err') { this.app.ui.toast(m.msg || 'Ошибка сервера', 'info'); }
+      else if (m.t === 'err') { this.app.ui.toast(m.msg || 'Ошибка сервера', 'info'); if (m.rejoin === false && this.app.state === 'game') this.app.quitToMenu(); }
     });
-    tr.onClose(() => { clearTimeout(to); if (tr.dead) return; if (this.status === 'connecting' && canRetry()) return retry(); const was = this.status; this.tr = null; this.closeQueue(); this.set(was === 'connecting' ? 'error' : 'offline'); if (this.app.state === 'game' && this.app.session && this.app.session.online && this.app.session.tr === tr) { this.app.ui.toast('Соединение потеряно', 'info'); this.app.quitToMenu(); } });
+    tr.onClose(() => { clearTimeout(to); if (tr.dead) return; if (this.status === 'connecting' && canRetry()) return retry(); const was = this.status; this.tr = null; this.closeQueue();
+      const inGame = this.app.state === 'game' && this.app.session && this.app.session.online && this.app.session.tr === tr;
+      if (inGame && this.rejoinToken && (this._rj = (this._rj || 0) + 1) <= 3) { tr.dead = true; this._rjPending = this.rejoinToken; this.set('connecting'); this.app.ui.toast('Связь пропала, возвращаемся в бой…', 'info'); this.retryT = setTimeout(() => { if (this._rjPending) this.connect(url, 0); }, 600); return; }
+      this.set(was === 'connecting' ? 'error' : 'offline'); if (inGame) { this.app.ui.toast('Соединение потеряно', 'info'); this.app.quitToMenu(); } });
   }
   disconnect() { if (this.tr) { const t = this.tr; this.tr = null; t.close(); } this.status = 'offline'; }
   quickMatch(mode) { if (!this.tr) return this.app.ui.toast('Сначала подключитесь к серверу', 'info'); const p = this.app.playerCfg(); this.tr.send({ t: 'qm', mode, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, tmod: p.tmod, build: p.build, loadout: p.loadout }); }

@@ -7,7 +7,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { WebSocketServer } from 'ws';
 import { HostSession } from '../src/net/host.js';
-import { PROTO, sanitizeName } from '../src/net/protocol.js';
+import { PROTO, sanitizeName, startMsg } from '../src/net/protocol.js';
+import crypto from 'crypto';
 import { VARIANTS } from '../src/sim/defs.js';
 import { MAPS, decodeMap } from '../src/sim/maps.js';
 import { buildValid, MODELS } from '../src/sim/models.js';
@@ -21,7 +22,7 @@ const MAX_TANKS = +process.env.MAX_TANKS || 24, NET_HZ = +process.env.NET_HZ || 
 // max humans per room; free slots are filled with bots
 const CAP = { moba: 10, br: 100, brg: 100, cbr: 100, cbr2: 100, cbr3: 100, cbr4: 100, cbr5: 100, cbr20: 100, ffa: 30, team: 20, team20: 40, arena: 6, duel: 2, koth: 10, sniper: 10, ctf: 10, hunt: 6, trench: 24, race: 8, survival: 8, zombie: 8, boss: 8, coop: 4 };
 const MAP_SIZES = { arena: [72, 48], duel: [72, 48], koth: [110, 72], sniper: [110, 72], ctf: [100, 64], hunt: [120, 80], trench: [220, 130] };
-function roomOpts(variant, n, cfg) {
+export function roomOpts(variant, n, cfg) {
   const V = VARIANTS[variant]; const o = { ...V.opts, variant }; cfg = cfg || {};
   if (V.mode === 'br' && !o.ffa && !o.giant) o.total = 100;
   if (V.mode === 'team' && o.special !== 'moba' && o.special !== 'race') { const sz = MAP_SIZES[variant] || [150, 96]; o.mapW = sz[0]; o.mapH = sz[1];
@@ -85,7 +86,8 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (data) => {
     const now = Date.now(); if (now - c.win > 1000) { c.win = now; c.msgs = 0; } if (++c.msgs > 90) return; // rate limit
     let m; try { m = JSON.parse(data); } catch (e) { return; } if (!m || typeof m.t !== 'string') return;
-    if (m.t === 'hello') { if (m.v !== PROTO) return send(c, { t: 'err', msg: 'Обновите игру: версия протокола отличается' }); c.hello = { name: sanitizeName(m.name), cc: (typeof m.cc === 'string' && /^[A-Z]{2}$/.test(m.cc)) ? m.cc : undefined, skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, cc: typeof m.cc === 'string' && /^[A-Z]{2}$/.test(m.cc) ? m.cc : undefined, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; send(c, { t: 'welcome', id: c.id, players: clients.size }); lobbyInfo(); }
+    if (m.t === 'rejoin') return adoptRejoin(c, m.token);
+    if (m.t === 'hello') { if (m.v !== PROTO) return send(c, { t: 'err', msg: 'Обновите игру: версия протокола отличается' }); const tlv = Number.isInteger(+m.tlv) && +m.tlv >= 1 && +m.tlv <= 20 ? (+m.tlv | 0) : undefined; c.hello = { name: sanitizeName(m.name), cc: (typeof m.cc === 'string' && /^[A-Z]{2}$/.test(m.cc)) ? m.cc : undefined, skin: m.skin, weapon: m.weapon, lv: m.lv, tlv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; send(c, { t: 'welcome', id: c.id, players: clients.size }); lobbyInfo(); }
     else if (m.t === 'qm') { if (!c.hello || c.room) return; const mode = CAP[m.mode] ? m.mode : 'br'; leavePrivate(c); leaveQueue(c); c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; c.mode = mode; queues[mode].push(c); if (queues[mode].length === 1) queueStart[mode] = Date.now(); queueTick(); }
     else if (m.t === 'cancel') leaveQueue(c);
     else if (m.t === 'create') { if (!c.hello || c.room) return; leaveQueue(c); leavePrivate(c); const variant = CAP[m.variant] ? m.variant : 'team'; c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) };
@@ -105,7 +107,7 @@ wss.on('connection', (ws, req) => {
     else if (m.t === 'in') { if (c.room) c.room.host.setInput(c.id, m); }
     else if (m.t === 'leave') leaveRoom(c);
   });
-  ws.on('close', () => { leaveQueue(c); leavePrivate(c); leaveRoom(c); clients.delete(c.id); lobbyInfo(); });
+  ws.on('close', () => { leaveQueue(c); leavePrivate(c); if (!armRejoin(c)) leaveRoom(c); clients.delete(c.id); lobbyInfo(); });
 });
 function leaveQueue(c) { for (const k of Object.keys(queues)) { const i = queues[k].indexOf(c); if (i >= 0) queues[k].splice(i, 1); } }
 function leaveRoom(c) { if (!c.room) return; c.room.host.removePlayer(c.id); c.room.members.delete(c.id); c.room = null; }
@@ -120,25 +122,74 @@ function queueTick() {
     if (q.length) queueStart[mode] = queueStart[mode] || now;
   }
 }
+const REJOIN_MS = +(process.env.REJOIN_MS ?? 45000);
+const parked = new Map();
+let shuttingDown = false;
+function armRejoin(c) {
+  if (shuttingDown || !c.room || !c.rejoinToken || c.room.host.ended || c.room.host.world.result) return false;
+  c.suspended = true;
+  const token = c.rejoinToken, prev = parked.get(token);
+  if (prev) clearTimeout(prev.timer);
+  const timer = setTimeout(() => { parked.delete(token); if (c.suspended && c.room) { c.suspended = false; leaveRoom(c); } }, REJOIN_MS);
+  parked.set(token, { c, timer });
+  return true;
+}
+function adoptRejoin(c, token) {
+  const slot = parked.get(String(token || ''));
+  if (!slot || !slot.c.room || slot.c.room.host.ended) return send(c, { t: 'err', msg: 'Бой уже закончился', rejoin: false });
+  clearTimeout(slot.timer); parked.delete(slot.c.rejoinToken);
+  const old = slot.c, room = old.room, hs = room.host.clients.get(old.id);
+  if (!hs || !hs.tank) return send(c, { t: 'err', msg: 'Бой уже закончился', rejoin: false });
+  room.wire.delete(old.id); room.members.delete(old.id);
+  room.wire.set(c.id, c); room.members.set(c.id, c);
+  room.host.clients.delete(old.id); room.host.clients.set(c.id, hs); hs.tank.cid = c.id;
+  c.room = room; c.hello = old.hello; c.rejoinToken = old.rejoinToken; c.suspended = false; c.mode = old.mode;
+  old.room = null; old.suspended = false;
+  send(c, startMsg(room.host.world, hs.tank.id));
+  send(c, { t: 'rj', token: c.rejoinToken, ms: REJOIN_MS });
+  room.host.broadcast();
+}
 function startRoom(variant, members, code, cfg) {
-  const id = nextRoom++; const map = new Map(members.map(c => [c.id, c]));
+  const id = nextRoom++; const wire = new Map(members.map(c => [c.id, c]));
   const players = members.map(c => ({ ...c.hello, cid: c.id, team: c.team ?? undefined }));
   const { mode, opts } = roomOpts(variant, members.length, cfg); if (code) opts.code = code;
-  { const avg = (rar) => { const L = players.filter(p => p.tmod && MODELS[p.model] && MODELS[p.model].rar === rar).map(p => p.tmod); return L.length ? L[0].map((_, i) => Math.round(L.reduce((a, b) => a + b[i], 0) / L.length)) : null; }; const lg = avg(3), my = avg(4); if (lg) opts.botMods = lg; if (my) opts.botMythMods = my; } // r37: bots get the average mod levels of the humans in the room (equal rules)
-  if (variant === 'hunt' && members.length) { let lo = Infinity; for (const c of members) lo = Math.min(lo, c.huntN | 0); const P = members.filter(c => (c.huntN | 0) === lo), T = P[Math.floor(Math.random() * P.length)]; T.huntN = (T.huntN | 0) + 1; opts.huntTarget = T.id; for (const p of players) p.team = undefined; } // r36: the target role rotates — whoever was target least often
-  const host = new HostSession({ mode, players, opts, send: (cid, msg) => { const c = map.get(cid); if (c) send(c, msg); } }); host.netDiv = Math.max(1, Math.round(60 / NET_HZ));
-  const room = { id, mode: variant, host, members: map, created: Date.now() };
-  for (const c of members) c.room = room;
+  { const avg = (rar) => { const L = players.filter(p => p.tmod && MODELS[p.model] && MODELS[p.model].rar === rar && (rar < 4 || opts.payments)).map(p => p.tmod); return L.length ? L[0].map((_, i) => Math.round(L.reduce((a, b) => a + b[i], 0) / L.length)) : null; }; const lg = avg(3), my = avg(4); if (lg) opts.botMods = lg; if (my && opts.payments) opts.botMythMods = my; } // legendary coin mods only, unless real-money checkout is explicitly enabled
+  if (variant === 'hunt' && members.length) { let lo = Infinity; for (const c of members) lo = Math.min(lo, c.huntN | 0); const P = members.filter(c => (c.huntN | 0) === lo), T = P[Math.floor(Math.random() * P.length)]; T.huntN = (T.huntN | 0) + 1; opts.huntTarget = T.id; for (const p of players) p.team = undefined; } // the target role rotates — whoever was target least often
+  const room = { id, mode: variant, host: null, members: wire, wire, created: Date.now() };
+  const host = new HostSession({ mode, players, opts, send: (cid, msg) => { const cl = wire.get(cid); if (cl && !cl.suspended) send(cl, msg); } }); host.netDiv = Math.max(1, Math.round(60 / NET_HZ));
+  room.host = host;
+  for (const c of members) { c.room = room; c.suspended = false; c.rejoinToken = crypto.randomBytes(9).toString('base64url'); }
   rooms.set(id, room); host.startAll();
+  for (const c of members) send(c, { t: 'rj', token: c.rejoinToken, ms: REJOIN_MS });
   console.log(`[room ${id}] ${variant}${code ? ' #' + code : ''} started with ${members.length} players`);
 }
-// fixed-step simulation for all rooms
+// fixed-step simulation for all rooms — started with the listener, so importing this module does not spin a loop
 let last = process.hrtime.bigint(), acc = 0; const STEP = 1 / 60; const stepStat = { avg: 0, max: 0, n: 0 };
-setInterval(() => { stepStat.max = 0; }, 10000);
-setInterval(() => {
-  const now = process.hrtime.bigint(); acc += Number(now - last) / 1e9; last = now; if (acc > 0.25) acc = 0.25;
-  while (acc >= STEP) { acc -= STEP; const t0 = process.hrtime.bigint(); for (const r of rooms.values()) { r.host.step(STEP); if ((r.host.ended && r.host.endT > 15) || r.members.size === 0) { for (const c of r.members.values()) c.room = null; rooms.delete(r.id); console.log(`[room ${r.id}] closed`); } }
-    const ms = Number(process.hrtime.bigint() - t0) / 1e6; stepStat.avg = stepStat.avg * 0.98 + ms * 0.02; stepStat.max = Math.max(stepStat.max, ms); }
-}, 4);
-setInterval(queueTick, 1000);
-server.listen(PORT, () => console.log(`PRICOPBUM server on http://localhost:${PORT}  (ws path /ws)`));
+let loopsOn = false;
+const timers = [];
+const every = (ms, fn) => { const id = setInterval(fn, ms); timers.push(id); return id; };
+export function startServer(port = PORT) {
+  if (!loopsOn) {
+    loopsOn = true;
+    every(10000, () => { stepStat.max = 0; });
+    every(4, () => {
+      const now = process.hrtime.bigint(); acc += Number(now - last) / 1e9; last = now; if (acc > 0.25) acc = 0.25;
+      while (acc >= STEP) { acc -= STEP; const t0 = process.hrtime.bigint(); for (const r of rooms.values()) { r.host.step(STEP); if ((r.host.ended && r.host.endT > 15) || (r.members.size === 0 && !parkedHas(r))) { for (const c of r.members.values()) c.room = null; rooms.delete(r.id); console.log(`[room ${r.id}] closed`); } }
+        const ms = Number(process.hrtime.bigint() - t0) / 1e6; stepStat.avg = stepStat.avg * 0.98 + ms * 0.02; stepStat.max = Math.max(stepStat.max, ms); }
+    });
+    every(1000, queueTick);
+  }
+  if (server.listening) return Promise.resolve(server);
+  return new Promise((resolve) => server.listen(port, '0.0.0.0', () => { console.log(`PRICOPBUM server on http://0.0.0.0:${server.address().port}  (ws path /ws)`); resolve(server); }));
+}
+function parkedHas(r) { for (const slot of parked.values()) if (slot.c.room === r) return true; return false; }
+export function stopServer() {
+  shuttingDown = true;
+  for (const id of timers) clearInterval(id);
+  timers.length = 0; loopsOn = false;
+  for (const slot of parked.values()) clearTimeout(slot.timer);
+  parked.clear();
+  return new Promise((resolve) => { if (!server.listening) resolve(); else server.close(() => resolve()); });
+}
+const isMain = process.argv[1] && path.resolve(fileURLToPath(import.meta.url)) === path.resolve(process.argv[1]);
+if (isMain) startServer(PORT);

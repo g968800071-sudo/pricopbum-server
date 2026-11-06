@@ -52,8 +52,8 @@ for (let n = 0; MODELS.length < 200; n++) { const B = MODELS[(n * 7) % 108], r =
 const FREE = [0, 1, 12, 13, 24, 36, 48, 60, 72, 84];
 for (const m of MODELS) {
   if (FREE.includes(m.id)) m.unlock = { t: 'free' };
-  else if (m.rar === 4) m.unlock = { t: 'iap', iap: 'tank_' + m.id, price: '449 ₽' }; // мифический: только за реальные деньги
-  else if (m.rar === 3) m.unlock = { t: 'box', iap: 'tank_' + m.id, price: '199 ₽' }; // легендарный: только ящики или реальные деньги
+  else if (m.rar === 4) m.unlock = { t: 'later', iap: 'tank_' + m.id, price: 'недоступно' }; // мифический: реальные деньги отложены, предмет не выдаётся
+  else if (m.rar === 3) m.unlock = { t: 'box', price: 'недоступно' }; // легендарный: ящики и монеты; оплата деньгами не подключена
   else if (m.id % 3 === 0) m.unlock = { t: 'level', lv: 2 + (m.id % 24) };
   else m.unlock = { t: 'coins', price: 400 + m.rar * 600 + (m.id % 5) * 100 };
 }

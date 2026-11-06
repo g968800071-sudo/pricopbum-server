@@ -1,4 +1,5 @@
 import { normLoadout } from '../sim/loadout.js';
+import { normTmod } from '../sim/tmods.js';
 // Authoritative match host. Used by the Node server and by the phone hosting a Bluetooth game.
 import { World } from '../sim/sim.js';
 import { WEAPON_LIST, SHOP_WEAPONS, SKINS, UPGRADES } from '../sim/defs.js';
@@ -7,7 +8,8 @@ import { buildValid } from '../sim/models.js';
 
 export function sanitizePlayer(p, free) {
   const lv = {}; for (const k of Object.keys(UPGRADES)) lv[k] = Math.max(0, Math.min(free ? UPGRADES[k].max : Math.min(2, UPGRADES[k].max), /* online «равные условия»: garage upgrades capped at level 2 */ (p.lv && +p.lv[k]) | 0));
-  return { cid: p.cid, name: sanitizeName(p.name), skin: SKINS[p.skin] ? p.skin : 'olive', weapon: SHOP_WEAPONS.includes(p.weapon) ? p.weapon : 'cannon', lv, model: Number.isInteger(p.model) && p.model >= 0 && p.model < 200 ? p.model : 0, cc: (typeof p.cc === 'string' && /^[A-Z]{2}$/.test(p.cc)) ? p.cc : undefined, build: buildValid(p.build) ? p.build.slice() : null, loadout: normLoadout(p.loadout), human: true, team: p.team === 0 || p.team === 1 ? p.team : undefined };
+  const tlv = Number.isInteger(+p.tlv) && +p.tlv >= 1 && +p.tlv <= 20 ? (+p.tlv | 0) : undefined;
+  return { cid: p.cid, name: sanitizeName(p.name), skin: SKINS[p.skin] ? p.skin : 'olive', weapon: SHOP_WEAPONS.includes(p.weapon) ? p.weapon : 'cannon', lv, tmod: normTmod(p.tmod), tlv, model: Number.isInteger(p.model) && p.model >= 0 && p.model < 200 ? p.model : 0, cc: (typeof p.cc === 'string' && /^[A-Z]{2}$/.test(p.cc)) ? p.cc : undefined, build: buildValid(p.build) ? p.build.slice() : null, loadout: normLoadout(p.loadout), human: true, team: p.team === 0 || p.team === 1 ? p.team : undefined };
 }
 export class HostSession {
   constructor({ mode, players, opts = {}, send }) {
