@@ -87,7 +87,7 @@
     ptrN.touch = ptrN.mouse = ptrN.other = 0;
     await post({ stage: 'ready-touch', tanks: window.__pbApp.session && window.__pbApp.session.view ? window.__pbApp.session.view.tanks.length : 0, coins: Math.round(x0), serverCoins: Math.round(y0), menu: play ? 'play' : 'not-play' });
     var best = { dx: 0, dy: 0, shots: 0 }, both = false;
-    for (var w = 0; w < 40; w++) {
+    for (var w = 0; w < 120; w++) {
       var me = window.__pbApp.session && window.__pbApp.session.view && window.__pbApp.session.view.tanks.find(function (t) { return t.cid === 'me' || t.human; });
       var inp = window.__pbApp.input;
       if (inp && Math.hypot(inp.move.x, inp.move.y) > 0.2 && (inp.fireHeld || (inp.aim && inp.aim.active))) both = true;

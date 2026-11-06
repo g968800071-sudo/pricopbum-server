@@ -1,5 +1,7 @@
 #import "TouchInject.h"
 #import <objc/message.h>
+#import <objc/runtime.h>
+#import <stdlib.h>
 
 static id pbCallInit(Class cls, NSString *name, CGPoint point, NSTimeInterval offset) {
     SEL sel = NSSelectorFromString(name);
@@ -12,7 +14,17 @@ void pbInjectTwoSticks(CGPoint moveDown, CGPoint moveTo, CGPoint aimDown, CGPoin
     Class pathCls = NSClassFromString(@"XCPointerEventPath");
     Class recCls = NSClassFromString(@"XCSynthesizedEventRecord");
     Class genCls = NSClassFromString(@"XCEventGenerator");
-    if (!pathCls || !recCls || !genCls) { done(@"missing-xc-event"); return; }
+    if (!pathCls || !recCls || !genCls) {
+        unsigned int n = 0; Class *all = objc_copyClassList(&n);
+        NSMutableString *hit = [NSMutableString stringWithString:@"missing-xc-event"];
+        for (unsigned int i = 0; i < n && hit.length < 400; i++) {
+            NSString *name = NSStringFromClass(all[i]);
+            if ([name containsString:@"Pointer"] || [name containsString:@"EventRecord"] || [name containsString:@"EventGenerator"] || [name containsString:@"Synthesized"]) [hit appendFormat:@" %@", name];
+        }
+        free(all);
+        done(hit);
+        return;
+    }
     id move = pbCallInit(pathCls, @"initForTouchAtPoint:offset:", moveDown, 0);
     id aim = pbCallInit(pathCls, @"initForTouchAtPoint:offset:", aimDown, 0);
     if (!move || !aim) { done(@"no-initForTouchAtPoint"); return; }

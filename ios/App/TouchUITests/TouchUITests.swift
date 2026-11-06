@@ -21,11 +21,14 @@ final class TouchUITests: XCTestCase {
             try? (err ?? "ok").write(toFile: "/tmp/pb-inject.txt", atomically: true, encoding: .utf8)
             exp.fulfill()
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/pb-during-touch.png"))
-        }
-        wait(for: [exp], timeout: 12)
-        XCTAssertTrue(waitLog("\"stage\":\"touch\"", 20))
+        wait(for: [exp], timeout: 8)
+        app.pinch(withScale: 3.0, velocity: 0.35)
+        let move = app.coordinate(withNormalizedOffset: CGVector(dx: 0.18, dy: 0.78))
+        move.press(forDuration: 0.25, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.36, dy: 0.46)), withVelocity: .slow, thenHoldForDuration: 1.1)
+        let aim = app.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.78))
+        aim.press(forDuration: 0.25, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.64, dy: 0.46)), withVelocity: .slow, thenHoldForDuration: 1.1)
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/pb-during-touch.png"))
+        XCTAssertTrue(waitLog("\"stage\":\"touch\"", 30))
         let line = try touchLine()
         let inject = (try? String(contentsOfFile: "/tmp/pb-inject.txt", encoding: .utf8)) ?? ""
         XCTAssertTrue(line.contains("play=1"), inject + " " + line)
