@@ -20,18 +20,22 @@ const WWW = path.resolve(__dir, '../www');
 const PORT = +process.env.PORT || 8080, QUEUE_SECONDS = +(process.env.QUEUE_SECONDS ?? 12), MAX_ROOMS = +process.env.MAX_ROOMS || 20;
 // r31: cheap defaults for Render free (0.1 CPU): cap tanks per online room and send 15 snapshots/s. Override with MAX_TANKS / NET_HZ.
 const MAX_TANKS = +process.env.MAX_TANKS || 24, NET_HZ = +process.env.NET_HZ || 15;
-// max humans per room; free slots are filled with bots
-const CAP = { moba: 10, br: 100, brg: 100, cbr: 100, cbr2: 100, cbr3: 100, cbr4: 100, cbr5: 100, cbr20: 100, ffa: 30, team: 20, team20: 40, arena: 6, duel: 2, koth: 10, sniper: 10, ctf: 10, hunt: 6, trench: 30, race: 8, survival: 8, zombie: 8, boss: 8, coop: 4 };
-// How many humans a room may actually start. Trenches stays 15×15. Every other mode is also limited by MAX_TANKS.
+// Battle royale and its constructor variants are a 150-human room. Other modes stay on MAX_TANKS.
+const BR_CAP = 150;
+const CAP = { moba: 10, br: BR_CAP, brg: 100, cbr: BR_CAP, cbr2: BR_CAP, cbr3: BR_CAP, cbr4: BR_CAP, cbr5: BR_CAP, cbr20: BR_CAP, ffa: 30, team: 20, team20: 40, arena: 6, duel: 2, koth: 10, sniper: 10, ctf: 10, hunt: 6, trench: 30, race: 8, survival: 8, zombie: 8, boss: 8, coop: 4 };
+export function isBr150(variant) { return variant === 'br' || (typeof variant === 'string' && variant.startsWith('cbr')); }
+// How many humans a room may actually start. Trenches stays 15×15. Giant BR stays on MAX_TANKS.
 export function admitCount(variant) {
   const listed = CAP[variant] || MAX_TANKS;
   if (variant === 'trench') return listed;
+  if (isBr150(variant)) return BR_CAP;
   return Math.min(listed, MAX_TANKS);
 }
 const MAP_SIZES = { arena: [72, 48], duel: [72, 48], koth: [110, 72], sniper: [110, 72], ctf: [100, 64], hunt: [120, 80], trench: [220, 130] };
 export function roomOpts(variant, n, cfg) {
   const V = VARIANTS[variant]; const o = { ...V.opts, variant }; cfg = cfg || {};
-  if (V.mode === 'br' && !o.ffa && !o.giant) o.total = 100;
+  if (isBr150(variant)) o.total = BR_CAP;
+  else if (V.mode === 'br' && !o.ffa && !o.giant) o.total = 100;
   if (V.mode === 'team' && o.special !== 'moba' && o.special !== 'race') { const sz = MAP_SIZES[variant] || [150, 96]; o.mapW = sz[0]; o.mapH = sz[1];
     if (cfg.map === 'custom' && cfg.custom && decodeMap(cfg.custom)) o.custom = cfg.custom; else o.map = Number.isInteger(cfg.map) && cfg.map >= 0 && cfg.map < MAPS.length ? cfg.map : (o.map ?? Math.floor(Math.random() * MAPS.length)); }
   // «Игра с друзьями»: host settings
@@ -48,10 +52,10 @@ export function roomOpts(variant, n, cfg) {
   if (variant === 'br' || variant === 'brg') o.terrain = 1; // r37: hills & craters in the big BR
   if (variant === 'trench') { o.map = V.opts.map; delete o.custom; o.mapW = 220; o.mapH = 130; o.timeLimit = cfg.time || 900; o.target = V.opts.target; } // r37 «Траншеи»: fixed 220×130 map, 15 min, most kills wins
   if (variant === 'hunt') { o.map = V.opts.map; delete o.custom; o.mapW = 120; o.mapH = 80; o.perTeam = 5; o.timeLimit = 600; o.target = V.opts.target; } // r36 «Охота»: fixed BUGA.BUM, 1 target + 5 hunters, 10 min
-  // Humans already admitted cannot raise the room above MAX_TANKS. Earlier lines may set total to n for a private room.
-  if (o.total) o.total = Math.min(Math.max(n, o.total), MAX_TANKS);
+  // Battle royale may fill to BR_CAP. Every other counted room stays within MAX_TANKS.
+  if (o.total) o.total = Math.min(Math.max(n, o.total), isBr150(variant) ? BR_CAP : MAX_TANKS);
   if (o.perTeam) o.perTeam = Math.max(Math.ceil(n / 2), Math.min(o.perTeam, MAX_TANKS >> 1));
-  if (variant === 'trench') o.perTeam = 15; // 15×15 = 30 tanks. The general MAX_TANKS cap still limits battle royale. 150 players are not enabled.
+  if (variant === 'trench') o.perTeam = 15; // 15×15 = 30 tanks.
   return { mode: V.mode, opts: o };
 }
 const ROOM_VARIANTS = Object.keys(CAP);
@@ -80,10 +84,11 @@ function readBody(req, limit = 65536) {
     req.on('error', reject);
   });
 }
-function sendJson(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(b); }
+const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type' };
+function sendJson(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS }); res.end(b); }
 function getAccountSafe(token) { return getAccount(accounts, token) || { ok: false }; }
 export function serverFeatures() {
-  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: MAX_TANKS, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGoal: 150, brGoalVerified: false, hostedTournament: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node' };
+  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGoal: 150, brGoalVerified: false, hostedTournament: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.1.0' };
 }
 function applyAccountTmod(c) {
   if (!c.hello) return;
@@ -95,24 +100,31 @@ function applyAccountTmod(c) {
 
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
+  if (req.method === 'OPTIONS' && u.pathname.startsWith('/api/')) { res.writeHead(204, { ...CORS, 'access-control-max-age': '600' }); return res.end(); }
   if (u.pathname === '/api/capabilities') return sendJson(res, 200, serverFeatures());
   if (u.pathname === '/api/account' && req.method === 'GET') return sendJson(res, 200, getAccountSafe(u.searchParams.get('token')));
   if (u.pathname === '/api/account' && req.method === 'POST') { readBody(req).then((body) => { const acc = createAccount(accounts, { token: body.token, name: body.name, local: body.local }); sendJson(res, 200, acc); }).catch(() => sendJson(res, 400, { ok: false })); return; }
   if (u.pathname === '/api/account/spend' && req.method === 'POST') { readBody(req).then((body) => sendJson(res, 200, spendLegendary(accounts, body.token, body.model, body.track))).catch(() => sendJson(res, 400, { ok: false })); return; }
   if (u.pathname === '/privacy' || u.pathname === '/privacy/') { try { const b = fs.readFileSync(path.join(WWW, 'privacy.html')); res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(b); } catch (e) { res.writeHead(404); return res.end('not found'); } }
   if (u.pathname === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('PRICOPBUM server OK'); }
-  if (u.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, players: clients.size, rooms: rooms.size, privateRooms: codes.size, stepMs: +stepStat.avg.toFixed(3), stepMaxMs: +stepStat.max.toFixed(3), maxTanks: MAX_TANKS, netHz: NET_HZ, features: serverFeatures(), list: [...rooms.values()].map(r => ({ id: r.id, variant: r.mode, humans: r.members.size, tanks: r.host.world.tanks.length, alive: r.host.world.tanks.filter(t => t.alive).length })) })); }
+  if (u.pathname === '/health') { const mem = process.memoryUsage(); res.writeHead(200, { 'content-type': 'application/json', ...CORS }); return res.end(JSON.stringify({ ok: true, players: clients.size, rooms: rooms.size, privateRooms: codes.size, stepMs: +stepStat.avg.toFixed(3), stepMaxMs: +stepStat.max.toFixed(3), maxTanks: MAX_TANKS, netHz: NET_HZ, rssMb: Math.round(mem.rss / 1048576), heapMb: Math.round(mem.heapUsed / 1048576), features: serverFeatures(), list: [...rooms.values()].map(r => ({ id: r.id, variant: r.mode, humans: r.members.size, tanks: r.host.world.tanks.length, alive: r.host.world.tanks.filter(t => t.alive).length })) })); }
   let p = path.normalize(path.join(WWW, decodeURIComponent(u.pathname)));
   if (!p.startsWith(WWW)) { res.writeHead(403); return res.end(); }
   if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, 'index.html');
   fs.readFile(p, (err, data) => { if (err) { res.writeHead(404); return res.end('not found'); } res.writeHead(200, { 'content-type': MIME[path.extname(p)] || 'application/octet-stream', 'cache-control': 'no-cache' }); res.end(data); });
 });
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096, perMessageDeflate: { threshold: 512, zlibDeflateOptions: { level: 1 }, serverNoContextTakeover: false, concurrencyLimit: 4 } });
+// No per-message deflate. A retained zlib context per socket was part of the multi-client memory growth.
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 4096, perMessageDeflate: false });
 const clients = new Map(); let nextCid = 1;
 const queues = Object.fromEntries(Object.keys(CAP).map(k => [k, []])); const queueStart = Object.fromEntries(Object.keys(CAP).map(k => [k, 0]));
 const rooms = new Map(); let nextRoom = 1;
 
-const send = (c, o) => { if (c.ws.readyState === 1) c.ws.send(JSON.stringify(o)); };
+const send = (c, o) => {
+  if (c.ws.readyState !== 1) return;
+  // A slow client must not pin every snapshot. The next tick replaces a dropped one.
+  if (o && o.t === 's' && c.ws.bufferedAmount > 262144) { c.dropped = (c.dropped | 0) + 1; return; }
+  c.ws.send(JSON.stringify(o));
+};
 function lobbyInfo() { for (const c of clients.values()) if (!c.room) send(c, { t: 'lobby', players: clients.size }); }
 
 wss.on('connection', (ws, req) => {

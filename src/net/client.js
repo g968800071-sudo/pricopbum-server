@@ -4,7 +4,7 @@ import { T_HATCH } from '../sim/defs.js';
 import { decTank, mapFor, PROTO } from './protocol.js';
 import { WEAPON_LIST } from '../sim/defs.js';
 
-export const VNAME = { trench: 'Траншеи 15×15', moba: 'Оборона баз 30×30', br: 'Королевская битва (100)', cbr: 'Конструктор BR', cbr2: 'Конструктор BR · дуо', cbr3: 'Конструктор BR · трио', cbr4: 'Конструктор BR · отряд 4', cbr5: 'Конструктор BR · отряд 5', cbr20: 'Конструктор BR · отряды по 20', team: 'Командный бой 10×10', team20: 'Битва 20×20', ffa: 'Каждый за себя', arena: 'Арена 3×3', duel: 'Дуэль 1×1', koth: 'Царь горы', sniper: 'Снайперы', ctf: 'Захват флага 5×5', race: 'Танковые гонки', brg: 'Гигантская BR', survival: 'Выживание', zombie: 'Зомби-волны', boss: 'Босс «Мамонт»', coop: 'Кооператив' };
+export const VNAME = { trench: 'Траншеи 15×15', moba: 'Оборона баз 30×30', br: 'Королевская битва (150)', cbr: 'Конструктор BR', cbr2: 'Конструктор BR · дуо', cbr3: 'Конструктор BR · трио', cbr4: 'Конструктор BR · отряд 4', cbr5: 'Конструктор BR · отряд 5', cbr20: 'Конструктор BR · отряды по 20', team: 'Командный бой 10×10', team20: 'Битва 20×20', ffa: 'Каждый за себя', arena: 'Арена 3×3', duel: 'Дуэль 1×1', koth: 'Царь горы', sniper: 'Снайперы', ctf: 'Захват флага 5×5', race: 'Танковые гонки', brg: 'Гигантская BR', survival: 'Выживание', zombie: 'Зомби-волны', boss: 'Босс «Мамонт»', coop: 'Кооператив' };
 export class WsTransport {
   constructor(url) { this.url = url; this.handlers = []; this.closeHandlers = []; this.openHandlers = [];
     try { this.ws = new WebSocket(url); } catch (e) { this.ws = { readyState: 3, send() {}, close() {} }; setTimeout(() => { for (const h of this.closeHandlers) h(); }, 0); return; }

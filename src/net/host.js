@@ -37,6 +37,10 @@ export class HostSession {
       this.send(cid, snapshot(w, focus, c.evBuf, tiles, w.mode !== 'br', c.tank));
       c.evBuf.length = 0;
     }
+    // Drop tile deltas every client has already been offered, so the change log cannot grow for the whole match.
+    let min = Infinity;
+    for (const c of this.clients.values()) if (c.tilePtr < min) min = c.tilePtr;
+    if (min > 0 && min < Infinity && m.changes) { m.changes.splice(0, min); for (const c of this.clients.values()) c.tilePtr -= min; }
   }
   get humans() { return this.clients.size; }
 }

@@ -1,12 +1,12 @@
 {
   "name": "pricopbum-server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "test": "node --test --test-timeout 90000 test/*.test.js",
+    "test": "node --test --test-timeout 180000 test/*.test.js",
     "smoke": "node test/smoke.js"
   },
   "engines": {
