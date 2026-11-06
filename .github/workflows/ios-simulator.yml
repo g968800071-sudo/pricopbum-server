@@ -117,7 +117,7 @@ jobs:
           echo $! > /tmp/pb-shots.pid
           cd "$GITHUB_WORKSPACE/ios/App"
           xcodebuild test \
-            -project App.xcodeproj \
+            -workspace App.xcworkspace \
             -scheme TouchUITests \
             -destination "id=$UDID" \
             -derivedDataPath "$GITHUB_WORKSPACE/ios-derived-qa" \
