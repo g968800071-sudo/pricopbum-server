@@ -1,0 +1,9 @@
+{
+  "appId": "studio.pricop.pricopbum",
+  "appName": "PRICOPBUM",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true
+  }
+}

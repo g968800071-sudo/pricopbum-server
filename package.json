@@ -1,1 +1,26 @@
-{"name":"pricopbum-server","version":"1.0.0","private":true,"type":"module","main":"server/server.js","scripts":{"start":"node server/server.js"},"engines":{"node":">=18"},"dependencies":{"ws":"^8.22.1"}}
+{
+  "name": "pricopbum-server",
+  "version": "1.2.5",
+  "private": true,
+  "type": "module",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "test": "node --test --test-timeout 180000 test/*.test.js",
+    "smoke": "node test/smoke.js",
+    "build": "node build.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.12"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/ios": "^6.2.0",
+    "ws": "^8.22.1"
+  }
+}

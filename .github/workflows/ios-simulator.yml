@@ -1,0 +1,202 @@
+# Unsigned iOS Simulator build on a standard GitHub-hosted macOS runner.
+# Public repositories: macos-26-intel is a free standard Intel runner (4 CPU, 14 GB).
+# macos-latest is arm64 and was cancelled while queued for capacity.
+# https://docs.github.com/en/actions/reference/runners/github-hosted-runners
+# This does not sign, archive for a device, or submit to the App Store or TestFlight.
+name: iOS simulator unsigned
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cursor/pricopbum-playable-3830
+
+jobs:
+  simulator:
+    runs-on: macos-26-intel
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Copy the web bundle into the iOS project
+        run: npx cap copy ios
+
+      - name: Install CocoaPods
+        working-directory: ios/App
+        run: pod install
+
+      - name: Build an unsigned simulator app
+        working-directory: ios/App
+        run: |
+          xcodebuild \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$GITHUB_WORKSPACE/ios-derived" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build
+
+      - name: Record what was built
+        run: |
+          APP="$GITHUB_WORKSPACE/ios-derived/Build/Products/Debug-iphonesimulator/App.app"
+          mkdir -p "$GITHUB_WORKSPACE/ios-report"
+          {
+            echo "runner=$(sw_vers -productVersion) $(uname -m)"
+            xcodebuild -version
+            echo "app=$APP"
+            file "$APP/App" || true
+            codesign -dv "$APP" 2>&1 || true
+          } | tee "$GITHUB_WORKSPACE/ios-report/build.txt"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pricopbum-ios-simulator-unsigned
+          if-no-files-found: error
+          path: |
+            ios-derived/Build/Products/Debug-iphonesimulator/App.app
+            ios-report
+
+      - name: Boot a simulator and launch the unsigned app
+        run: |
+          set -euo pipefail
+          python3 - << 'PY'
+          import json, subprocess
+          raw = subprocess.check_output(["xcrun", "simctl", "list", "devices", "available", "-j"], text=True)
+          data = json.loads(raw)
+          pick = None
+          for runtime, devices in data.get("devices", {}).items():
+              if "iOS" not in runtime:
+                  continue
+              for d in devices:
+                  if d.get("isAvailable") and "iPhone" in d.get("name", ""):
+                      pick = d
+                      break
+              if pick:
+                  break
+          if not pick:
+              raise SystemExit("no available iPhone simulator")
+          open("/tmp/sim-udid.txt", "w").write(pick["udid"])
+          print(pick["name"], pick["udid"])
+          PY
+          UDID=$(cat /tmp/sim-udid.txt)
+          xcrun simctl boot "$UDID" || true
+          # First boot can sit in CoreLocation migration for several minutes. Cap it so it cannot wait forever.
+          perl -e 'alarm 480; exec @ARGV' xcrun simctl bootstatus "$UDID" -b
+          rm -f /tmp/pb-ios-probe.sqlite /tmp/pb-probe.jsonl
+          PB_PROBE=1 PB_PROBE_LOG=/tmp/pb-probe.jsonl PORT=8799 ACCOUNT_DB=/tmp/pb-ios-probe.sqlite QUEUE_SECONDS=120 node server/server.js > "$GITHUB_WORKSPACE/ios-report/server.log" 2>&1 &
+          echo $! > /tmp/pb-ios-server.pid
+          trap 'cp /tmp/pb-probe.jsonl "$GITHUB_WORKSPACE/ios-report/probe.jsonl" 2>/dev/null || true; mkdir -p "$GITHUB_WORKSPACE/ios-report/shots"; cp /tmp/pb-shop.png /tmp/pb-during-touch.png /tmp/pb-inject.txt "$GITHUB_WORKSPACE/ios-report/shots/" 2>/dev/null || true' EXIT
+          for i in 1 2 3 4 5 6 7 8 9 10; do curl -sf http://127.0.0.1:8799/health >/dev/null && break; sleep 1; done
+          curl -sf http://127.0.0.1:8799/health >/dev/null || { echo 'throwaway server did not start'; cat "$GITHUB_WORKSPACE/ios-report/server.log" || true; exit 1; }
+          mkdir -p "$GITHUB_WORKSPACE/ios-report/shots"
+          python3 - << 'PY'
+          from pathlib import Path
+          p = Path('ios/App/App/public/index.html')
+          t = p.read_text()
+          if '__pbProbe' not in t:
+              t = t.replace('<head>', '<head><script>window.__pbProbe=true</script>', 1)
+              p.write_text(t)
+          PY
+          (
+            for n in $(seq 1 30); do
+              xcrun simctl io "$UDID" screenshot "$GITHUB_WORKSPACE/ios-report/shots/shot-$(printf '%02d' "$n").png" >/dev/null 2>&1 || true
+              sleep 5
+            done
+          ) &
+          echo $! > /tmp/pb-shots.pid
+          cd "$GITHUB_WORKSPACE/ios/App"
+          set +e
+          xcodebuild test \
+            -workspace App.xcworkspace \
+            -scheme TouchUITests \
+            -destination "id=$UDID" \
+            -derivedDataPath "$GITHUB_WORKSPACE/ios-derived-qa" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM=""
+          xc=$?
+          set -e
+          echo "xcodebuild_exit=$xc" | tee "$GITHUB_WORKSPACE/ios-report/xcodebuild.txt"
+          python3 - << 'PY'
+          import pathlib
+          log = pathlib.Path('/tmp/pb-probe.jsonl')
+          text = log.read_text() if log.exists() else ''
+          print(text)
+          touch = [line for line in text.splitlines() if '"stage":"touch"' in line or '"stage": "touch"' in line]
+          last = touch[-1] if touch else 'no touch stage'
+          print('touch-recorded', last)
+          pathlib.Path('/tmp/pb-touch-summary.txt').write_text(last + '\n')
+          PY
+          xcrun simctl io "$UDID" screenshot "$GITHUB_WORKSPACE/ios-report/shots/before-relaunch.png" || true
+          xcrun simctl terminate "$UDID" studio.pricop.pricopbum || true
+          kill "$(cat /tmp/pb-ios-server.pid)" 2>/dev/null || true
+          sleep 1
+          PB_PROBE=1 PB_PROBE_LOG=/tmp/pb-probe.jsonl PORT=8799 ACCOUNT_DB=/tmp/pb-ios-probe.sqlite QUEUE_SECONDS=120 node server/server.js >> "$GITHUB_WORKSPACE/ios-report/server.log" 2>&1 &
+          echo $! > /tmp/pb-ios-server.pid
+          for i in 1 2 3 4 5 6 7 8 9 10; do curl -sf http://127.0.0.1:8799/health >/dev/null && break; sleep 1; done
+          xcrun simctl launch "$UDID" studio.pricop.pricopbum -pbProbe | tee -a "$GITHUB_WORKSPACE/ios-report/launch.txt"
+          node --input-type=module << 'JS' &
+          import { WebSocket } from 'ws';
+          const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+          for (let i = 0; i < 80; i++) {
+            const health = await fetch('http://127.0.0.1:8799/health').then(r => r.json()).catch(() => null);
+            if (health && health.players > 0) break;
+            await sleep(500);
+          }
+          const bots = ['B1', 'B2', 'B3'].map(name => new Promise((resolve, reject) => {
+            const ws = new WebSocket('ws://127.0.0.1:8799/ws');
+            const timer = setTimeout(() => reject(new Error(name)), 30000);
+            ws.on('open', () => ws.send(JSON.stringify({ t: 'hello', v: 5, name })));
+            ws.on('message', raw => {
+              const m = JSON.parse(raw.toString());
+              if (m.t === 'welcome') ws.send(JSON.stringify({ t: 'tourJoin', size: 4 }));
+              if (m.t === 'tour' && m.phase === 'lobby' && m.members && m.members.length === 4) ws.send(JSON.stringify({ t: 'tourReady' }));
+              if (m.t === 'tour' && (m.phase === 'live' || m.phase === 'done')) { clearTimeout(timer); resolve(name); }
+            });
+          }));
+          await Promise.all(bots);
+          JS
+          python3 - << 'PY'
+          import time, pathlib
+          log = pathlib.Path('/tmp/pb-probe.jsonl')
+          need = {'restored', 'watch'}
+          deadline = time.time() + 120
+          seen = set()
+          while time.time() < deadline and not need <= seen:
+              if log.exists():
+                  for line in log.read_text().splitlines():
+                      for stage in need:
+                          if f'"stage":"{stage}"' in line or f'"stage": "{stage}"' in line:
+                              seen.add(stage)
+              time.sleep(1)
+          print('second-pass', sorted(seen))
+          text = log.read_text() if log.exists() else 'no probe log'
+          print(text.replace('token', 'redacted') if 'token' in text else text)
+          if not need <= seen:
+              raise SystemExit('probe missing ' + ','.join(sorted(need - seen)))
+          PY
+          xcrun simctl io "$UDID" screenshot "$GITHUB_WORKSPACE/ios-report/shots/after-watch.png" || true
+          kill "$(cat /tmp/pb-shots.pid)" 2>/dev/null || true
+          kill "$(cat /tmp/pb-ios-server.pid)" 2>/dev/null || true
+          cp /tmp/pb-probe.jsonl "$GITHUB_WORKSPACE/ios-report/probe.jsonl"
+          echo "launched and probed on simulator $UDID" | tee -a "$GITHUB_WORKSPACE/ios-report/launch.txt"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pricopbum-ios-probe
+          if-no-files-found: warn
+          path: ios-report
