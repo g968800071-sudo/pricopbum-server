@@ -22,7 +22,7 @@ final class TouchUITests: XCTestCase {
             exp.fulfill()
         }
         wait(for: [exp], timeout: 8)
-        app.pinch(withScale: 3.0, velocity: 0.35)
+        app.pinch(withScale: 4.0, velocity: 0.25)
         let move = app.coordinate(withNormalizedOffset: CGVector(dx: 0.18, dy: 0.78))
         move.press(forDuration: 0.25, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.36, dy: 0.46)), withVelocity: .slow, thenHoldForDuration: 1.1)
         let aim = app.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.78))

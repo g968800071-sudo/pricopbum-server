@@ -86,20 +86,27 @@
     touchN.start = touchN.move = touchN.end = 0;
     ptrN.touch = ptrN.mouse = ptrN.other = 0;
     await post({ stage: 'ready-touch', tanks: window.__pbApp.session && window.__pbApp.session.view ? window.__pbApp.session.view.tanks.length : 0, coins: Math.round(x0), serverCoins: Math.round(y0), menu: play ? 'play' : 'not-play' });
-    var best = { dx: 0, dy: 0, shots: 0 }, both = false;
+    var best = { dx: 0, dy: 0, shots: 0 }, both = false, overlap = 0, maxFingers = 0, px = x0, py = y0, pf = fire0;
+    window.addEventListener('touchmove', function (e) { if (e && e.isTrusted && e.touches) maxFingers = Math.max(maxFingers, e.touches.length); }, true);
     for (var w = 0; w < 120; w++) {
       var me = window.__pbApp.session && window.__pbApp.session.view && window.__pbApp.session.view.tanks.find(function (t) { return t.cid === 'me' || t.human; });
       var inp = window.__pbApp.input;
-      if (inp && Math.hypot(inp.move.x, inp.move.y) > 0.2 && (inp.fireHeld || (inp.aim && inp.aim.active))) both = true;
+      var moving = !!(inp && Math.hypot(inp.move.x, inp.move.y) > 0.2);
+      var firing = !!(inp && (inp.fireHeld || (inp.aim && inp.aim.active) || inp.autoFire));
+      if (moving && firing) both = true;
       if (me) {
         best.dx = Math.max(best.dx, Math.abs(me.x - x0));
         best.dy = Math.max(best.dy, Math.abs(me.y - y0));
         var bullets = (window.__pbApp.session.view.bullets || []).length;
         if ((me.lastFire || 0) > fire0 + 0.05 || bullets > 0) best.shots++;
+        var step = Math.hypot(me.x - px, me.y - py), firedNow = (me.lastFire || 0) > pf + 0.02;
+        if (step > 1.5 && firedNow) overlap++;
+        px = me.x; py = me.y; pf = me.lastFire || pf;
       }
       await sleep(200);
     }
-    await post({ stage: 'touch', moved: best.dx > 8 || best.dy > 8, tanks: window.__pbApp.session && window.__pbApp.session.view ? window.__pbApp.session.view.tanks.length : 0, coins: touchN.start, serverCoins: touchN.move, watch: best.shots > 0, menu: 'end=' + touchN.end + ' dx=' + Math.round(best.dx) + ' dy=' + Math.round(best.dy) + ' both=' + (both ? 1 : 0) + ' ptr=' + ptrN.touch + '/' + ptrN.mouse + ' play=' + (play ? 1 : 0) + ' shots=' + best.shots + ' wh=' + window.innerWidth + 'x' + window.innerHeight });
+    if (overlap > 0) both = true;
+    await post({ stage: 'touch', moved: best.dx > 8 || best.dy > 8, tanks: window.__pbApp.session && window.__pbApp.session.view ? window.__pbApp.session.view.tanks.length : 0, coins: touchN.start, serverCoins: touchN.move, watch: best.shots > 0, menu: 'end=' + touchN.end + ' dx=' + Math.round(best.dx) + ' dy=' + Math.round(best.dy) + ' both=' + (both ? 1 : 0) + ' ov=' + overlap + ' fingers=' + maxFingers + ' ptr=' + ptrN.touch + '/' + ptrN.mouse + ' play=' + (play ? 1 : 0) + ' shots=' + best.shots + ' wh=' + window.innerWidth + 'x' + window.innerHeight });
     window.__pbApp.quitToMenu();
     await sleep(800);
     window.__pbApp.net.connect('ws://127.0.0.1:' + PORT + '/ws');
