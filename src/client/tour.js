@@ -1,10 +1,22 @@
 import { flagEmoji, ccOfName, ccFromLocale } from '../sim/flags.js';
+function tourBoard(text) {
+  if (typeof document === 'undefined') return;
+  let el = document.getElementById('pb-tour-board');
+  if (!text) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'pb-tour-board';
+    el.style.cssText = 'position:fixed;left:12px;right:12px;bottom:28px;z-index:50;padding:8px 12px;border-radius:12px;background:rgba(8,16,28,.94);color:#d7ecff;border:1px solid #7eb6ff;font:600 13px/1.35 system-ui,sans-serif;pointer-events:none';
+    document.body.appendChild(el);
+  }
+  el.textContent = text;
+}
 // Hosted knockout uses only connected players. The practice button is a local bot bracket and says so.
 import { h } from './dom.js';
 import { BOT_NAMES } from '../sim/defs.js';
 export const flagOf = (name) => flagEmoji(ccOfName(name));
 export function installTour(UI) { const P = UI.prototype;
-  P.tourMenu = function () { const ui = this, d = this.m.d;
+  P.tourMenu = function () { tourBoard(''); const ui = this, d = this.m.d;
     const online = this.app.net && this.app.net.status === 'online';
     this.show('tour', [h('div', { class: 'menu-bg' }), this.hdr('Турнир'), h('div', { class: 'scroll' }, h('div', { class: 'panel' },
       h('h3', null, 'Серверный турнир'),
@@ -29,6 +41,9 @@ export function installTour(UI) { const P = UI.prototype;
     const cols = rounds.map((R, ri) => h('div', { class: 'tcol' }, h('small', null, R.length === 1 ? 'Чемпион' : '1/' + (R.length / 2)), R.map(p => h('div', { class: 'tourp' + (p.id === msg.you ? ' me' : '') }, (p.flag || '') + ' ' + p.name))));
     const mine = live.find(m => m.a.id === msg.you || m.b.id === msg.you);
     const other = live.find(m => m !== mine);
+    const boardLine = other ? ('Табло счёта другого боя, не камера и не вид из танка: ' + other.a.name + ' ' + (other.killsA | 0) + ' — ' + (other.killsB | 0) + ' ' + other.b.name) : '';
+    tourBoard(msg.phase === 'live' ? boardLine : '');
+    try { window.__pbTour = { phase: msg.phase, size: msg.size, practice: false, humansOnly: true, members: members.map(p => p.name), board: boardLine }; } catch (e) {}
     const btn = [];
     btn.push(h('p', { class: 'note' }, 'Живые игроки на этом сервере. Ботов в сетке нет.'));
     if (msg.phase === 'lobby') {
@@ -41,11 +56,11 @@ export function installTour(UI) { const P = UI.prototype;
       btn.push(h('button', { class: 'btn big', onclick: () => ui.menu() }, 'В меню'));
     } else {
       if (mine && !mine.winner) btn.push(h('p', null, 'Ваш бой: ' + mine.a.name + ' ' + (mine.killsA | 0) + ' — ' + (mine.killsB | 0) + ' ' + mine.b.name));
-      if (other) btn.push(h('p', { class: 'note' }, 'Счёт другого боя живых игроков: ' + other.a.name + ' ' + (other.killsA | 0) + ' — ' + (other.killsB | 0) + ' ' + other.b.name));
+      if (boardLine) btn.push(h('p', { class: 'note' }, boardLine));
     }
     this.show('tour', [h('div', { class: 'menu-bg' }), this.hdr(msg.phase === 'done' ? 'Итог турнира' : 'Сетка турнира'), h('div', { class: 'scroll' }, h('div', { class: 'tbracket' }, cols), h('div', { class: 'btns' }, btn))]);
   };
-  P.tourPractice = function (n) { const ui = this, d = this.m.d;
+  P.tourPractice = function (n) { tourBoard(''); const ui = this, d = this.m.d;
     const me = { name: d.name || 'Игрок', flag: flagEmoji(d.cc || ccFromLocale(navigator.language)), me: 1, bot: false };
     const pool = BOT_NAMES.slice().sort(() => Math.random() - 0.5).slice(0, n - 1).map(nm => ({ name: nm + ' · бот', flag: flagOf(nm), bot: true, rt: 0.6 + Math.random() * 0.8 }));
     const all = [me, ...pool].sort(() => Math.random() - 0.5);

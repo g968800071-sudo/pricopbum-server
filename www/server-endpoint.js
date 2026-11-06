@@ -4,8 +4,16 @@
   var KEY = 'pricopbum_server';
   var PROD_ORIGIN = 'https://pricopbum-server.onrender.com';
   var PROD_WS = 'wss://pricopbum-server.onrender.com/ws';
-  var BUILD = '1.2.0';
-  function storeGet() { try { return (localStorage.getItem(KEY) || '').trim(); } catch (e) { return ''; } }
+  var BUILD = '1.2.1';
+  window.__pbDurableGet = function (key) {
+    try { if (window.pbStore && window.pbStore.get) { var v = window.pbStore.get(key); if (v) return String(v); } } catch (e) {}
+    try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
+  };
+  window.__pbDurableSet = function (key, value) {
+    try { if (window.pbStore && window.pbStore.set) window.pbStore.set(key, value || ''); } catch (e) {}
+    try { if (value) localStorage.setItem(key, value); else localStorage.removeItem(key); } catch (e) {}
+  };
+  function storeGet() { return (window.__pbDurableGet(KEY) || '').trim(); }
   function parse(raw) {
     if (!raw) return null;
     try {
@@ -18,12 +26,7 @@
     } catch (e) { return null; }
   }
   window.__pbBuild = BUILD;
-  window.__pbSetServer = function (raw) {
-    try {
-      if (raw) localStorage.setItem(KEY, raw);
-      else localStorage.removeItem(KEY);
-    } catch (e) {}
-  };
+  window.__pbSetServer = function (raw) { window.__pbDurableSet(KEY, raw || ''); };
   window.__pbResolveServer = function () {
     var custom = parse(storeGet());
     if (custom) return custom;

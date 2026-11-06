@@ -9,11 +9,11 @@ No signing secrets, keystores, or provisioning profiles are in this repository. 
 Built on this machine with the public Android command-line SDK (platform 35, build-tools 34/35) and JDK 21. Gradle signed it with the **debug** keystore that the Android Gradle plugin creates outside the repo (`~/.android/debug.keystore`). That file is not committed.
 
 - Project: `android/`
-- Package: `studio.pricop.pricopbum`, versionName `1.2.0`, versionCode `3`, minSdk 22, targetSdk 35
-- This is a later test than `1.1.0` (SHA256 `9efecc88c152cadcb33ef1075f6cc63b0f7e881af2b12687ffd2efe324eee0fb`) and the limited `1.0` APK (SHA256 `4572a4edddad394a032f3d6731df5d403d09c955c050bda5a28be0f251221764`). The screen shows `PRICOPBUM 1.2.0 test`.
+- Package: `studio.pricop.pricopbum`, versionName `1.2.1`, versionCode `4`, minSdk 22, targetSdk 35
+- This is a later test than `1.2.0` (SHA256 `359ed2e8944b3d86783e66887ffa3b6d68460783a4fe47001758adefac47ce66`), `1.1.0` (SHA256 `9efecc88c152cadcb33ef1075f6cc63b0f7e881af2b12687ffd2efe324eee0fb`) and the limited `1.0` APK (SHA256 `4572a4edddad394a032f3d6731df5d403d09c955c050bda5a28be0f251221764`). The screen shows `PRICOPBUM 1.2.1 test`.
 - Gradle output: `android/app/build/outputs/apk/debug/app-debug.apk`
-- SHA256: `359ed2e8944b3d86783e66887ffa3b6d68460783a4fe47001758adefac47ce66`
-- Copy: `/opt/cursor/artifacts/pricopbum-1.2.0-debug.apk`
+- SHA256: `1ca0194e7cbfe82f4a19571f4241d54bbacc0a4a36a86340af7b47197645416d`
+- Copy: `/opt/cursor/artifacts/pricopbum-1.2.1-debug.apk`
 
 Rebuild:
 
@@ -26,17 +26,15 @@ Install the debug APK with `adb install -r app-debug.apk` on a device that allow
 
 The WebView loads the files shipped inside the APK. It does not contain a game server. A cold launch does not open a socket and does not call `/api`. The page origin is `http://localhost` (the asset host). `www/server-endpoint.js` picks one game server for both the socket and the account API. Until the player enters another address, that server is `wss://pricopbum-server.onrender.com/ws` with API `https://pricopbum-server.onrender.com`. The public host is the old build. A welcome without `features` shows that new accounts, 30-player rooms, and 150-player battle royale are not available, and device coins are not sent.
 
-Installed on a local emulator (Pixel 6, Android 15, KVM). `am start -W` reported `LaunchState: COLD` for versionName `1.1.0`. Before connect, the page resolved the production address and had not called it. Connect was then pointed at a throwaway server on this machine (`ws://10.0.2.2:8765/ws`, not the public host). Logcat:
+Installed on a local emulator (Pixel 6, Android 15, KVM). For `1.2.1`, `am start -W` reported `LaunchState: COLD`. Cold launch resolved the production address and did not call it (`[pb-acct] no-restore productionDefault=true`). Connect was then pointed at a throwaway server on this machine (`ws://10.0.2.2:8791/ws`, sqlite file under `/tmp`, not the public host). The account token was also written to Android `SharedPreferences` (`pricopbum`) because WebView `localStorage` did not survive `am force-stop`.
 
-`[pb-boot] href=http://localhost/ api=http://10.0.2.2:8765/api/capabilities ws=ws://10.0.2.2:8765/ws native=true legacy=false`
-
-`[pb-acct] linked coins=0 credited=false`
-
-The device wallet stayed at 20 coins. The ledger row was coins 0, rank 0, no mods. A second throwaway socket that answered like the old server (welcome with no `features`) set the session unauthenticated and showed the limited-compatibility banner. No production user data was written. This was one emulator, not a physical phone.
+After connect, logcat recorded `[pb-acct] linked serverCoins=0 deviceCoins=20 auth=true credited=false`. Force-stop and a cold start then recorded `[pb-acct] restored` with the same token, `onlineAuth` true, device coins 20, and server coins 0. The socket was bound to that token (`payments` false). Four sockets (the emulator plus three Node clients named N1, N2, N3) finished a hosted bracket. During the other pairing the page text was `Табло счёта другого боя, не камера и не вид из танка: N1 0 — 0 N3`. The finished screen showed those names, the line `Живые игроки на этом сервере. Ботов в сетке нет.`, and `Champion — вы`. Device coins stayed 20. The throwaway ledger row for that token ended at 3 coins from the server match formula, not from the device wallet. No production user data was written. This was one emulator, not a physical phone. An online match does not add coins to the device wallet; the server ledger is the balance that changes.
 
 ## iOS
 
 `ios/` is the Capacitor/Xcode project. This Linux machine has no Xcode, so it cannot compile the shell. `.github/workflows/ios-simulator.yml` uses the standard free `macos-latest` runner on this public repository to install CocoaPods and build an unsigned iOS Simulator `.app`. That file is not a signed iPhone app and cannot be installed on a phone.
+
+GitHub Actions run `42198434197` completed on commit `8c739c612e8f9c0b4b72faef57ac9216c53c311f`. The runner was macOS 26.6.2 arm64 with Xcode 26.6 (build 17F113). `xcodebuild` produced `App.app`, a Mach-O universal binary (`x86_64` and `arm64`) for the simulator SDK. `codesign -dv` reported an ad-hoc linker signature, `TeamIdentifier=not set`, and no sealed resources. `simctl launch` started bundle `studio.pricop.pricopbum` as pid 9616 on simulator `7EFC6246-6BDB-4FD4-AE32-9345E3B28BD8`. The uploaded artifact is `pricopbum-ios-simulator-unsigned`. It is a simulator app from that commit, not an installable iPhone build, and it does not include the later 1.2.1 account fix. A push of this branch starts another standard `macos-latest` run.
 
 On a Mac, later:
 

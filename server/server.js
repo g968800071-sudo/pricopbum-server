@@ -89,7 +89,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods
 function sendJson(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS }); res.end(b); }
 function getAccountSafe(token) { return getAccount(accounts, token) || { ok: false }; }
 export function serverFeatures() {
-  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGoal: 150, brGoalVerified: false, hostedTournament: true, tourSizes: [2, 4, 8], tourPracticeBots: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.2.0' };
+  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGoal: 150, brGoalVerified: false, hostedTournament: true, tourSizes: [2, 4, 8], tourPracticeBots: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.2.1' };
 }
 function applyAccountTmod(c) {
   if (!c.hello) return;
@@ -155,6 +155,7 @@ wss.on('connection', (ws, req) => {
       codes.delete(r.code); const mem = [...r.members.values()].slice(0, admitCount(r.cfg.variant)); for (const x of mem) { x.priv = null; x.ready = false; } startRoom(r.cfg.variant, mem, r.code, r.cfg); }
     else if (m.t === 'in') { if (c.room) c.room.host.setInput(c.id, m); }
     else if (m.t === 'leave') leaveRoom(c);
+    else if (m.t === 'bindAcct') { c.accountToken = validToken(m.token); applyAccountTmod(c); send(c, { t: 'acctBound', ok: !!c.accountToken }); }
     else if (m.t === 'tourJoin') tourney.join(c, m.size);
     else if (m.t === 'tourReady') tourney.ready(c);
     else if (m.t === 'tourLeave') tourney.leave(c);

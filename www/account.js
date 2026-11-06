@@ -2,15 +2,15 @@
 // A device snapshot is never sent as spendable coins. Mythic purchases stay refused.
 (function () {
   var TOKEN_KEY = 'pricopbum_account';
-  function token() { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
-  function saveToken(t) { try { localStorage.setItem(TOKEN_KEY, t); } catch (e) {} }
+  function token() { return window.__pbDurableGet ? window.__pbDurableGet(TOKEN_KEY) : ''; }
+  function saveToken(t) { if (window.__pbDurableSet) window.__pbDurableSet(TOKEN_KEY, t || ''); }
   function api(path) { return (window.__pbApi ? window.__pbApi(path) : path); }
   function chip() {
     var el = document.getElementById('pb-build');
     if (el) return el;
     el = document.createElement('div');
     el.id = 'pb-build';
-    el.textContent = 'PRICOPBUM ' + (window.__pbBuild || '1.2.0') + ' test';
+    el.textContent = 'PRICOPBUM ' + (window.__pbBuild || '1.2.1') + ' test';
     el.style.cssText = 'position:fixed;left:8px;bottom:6px;z-index:40;font:600 11px system-ui,sans-serif;color:#ffd23d;pointer-events:none;text-shadow:0 1px 2px #000';
     document.body.appendChild(el);
     return el;
@@ -58,20 +58,85 @@
         .catch(function () { ui.toast('Счёт недоступен', 'info'); });
     });
   };
+  function applyLedger(meta, acc, how) {
+    var kept = meta.d.coins | 0;
+    window.__pbApplyAcct(meta, acc);
+    if ((meta.d.coins | 0) !== kept) meta.d.coins = kept;
+    try { meta.save(); } catch (e) {}
+    banner('Серверный счёт ' + (acc.coins | 0) + '. На устройстве ' + kept + '. Монеты устройства не зачислены.');
+    console.log('[pb-acct] ' + how + ' serverCoins=' + (acc.coins | 0) + ' deviceCoins=' + kept + ' auth=' + !!meta.d.onlineAuth + ' credited=false');
+    try {
+      var net = window.__pbApp && window.__pbApp.net;
+      if (net && net.tr && acc.token) net.tr.send({ t: 'bindAcct', token: acc.token });
+    } catch (e) {}
+  }
   function link(meta) {
-    var d = meta.d;
-    var kept = d.coins | 0;
-    var body = { token: token() || undefined, name: d.name || 'Игрок' };
-    return fetch(api('/api/account'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-      .then(function (r) { return r.json(); })
-      .then(function (acc) {
-        if (!acc || !acc.token || acc.coins == null) return;
-        window.__pbApplyAcct(meta, acc);
-        if ((meta.d.coins | 0) !== kept) meta.d.coins = kept;
-        try { meta.save(); } catch (e) {}
-        console.log('[pb-acct] linked coins=' + acc.coins + ' credited=false');
+    var body = { token: token() || undefined, name: meta.d.name || 'Игрок' };
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 8000);
+    return fetch(api('/api/account'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal })
+      .then(function (r) { return r.json().then(function (acc) { return { status: r.status, acc: acc }; }); })
+      .then(function (res) {
+        clearTimeout(timer);
+        if (!res.acc || !res.acc.token || res.acc.coins == null || res.acc.authoritative !== true) {
+          meta.d.onlineAuth = false;
+          banner('Сервер ответил, но счёт не создан. Монеты устройства не зачислены.');
+          console.log('[pb-acct] rejected status=' + res.status);
+          return;
+        }
+        applyLedger(meta, res.acc, 'linked');
+      })
+      .catch(function (err) {
+        clearTimeout(timer);
+        meta.d.onlineAuth = false;
+        banner('API счёта не ответил. Игра без серверного счёта. Монеты устройства на месте.');
+        console.log('[pb-acct] link-failed ' + (err && err.message ? err.message : err) + ' api=' + api('/api/account'));
       });
   }
+  function restore(meta, attempt) {
+    var saved = token();
+    var srv = window.__pbResolveServer ? window.__pbResolveServer() : null;
+    meta.d.onlineAuth = false;
+    if (!saved || !srv || srv.productionDefault) {
+      console.log('[pb-acct] no-restore productionDefault=' + !!(srv && srv.productionDefault));
+      return;
+    }
+    var ctrl = new AbortController();
+    var timer = setTimeout(function () { ctrl.abort(); }, 12000);
+    fetch(api('/api/account?token=' + encodeURIComponent(saved)), { signal: ctrl.signal })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (acc) {
+        clearTimeout(timer);
+        if (!acc || acc.token !== saved || acc.coins == null || acc.authoritative !== true) {
+          meta.d.onlineAuth = false;
+          banner('Сохранённый счёт на этом сервере не найден. Монеты устройства не зачислены.');
+          console.log('[pb-acct] restore-miss');
+          return;
+        }
+        applyLedger(meta, acc, 'restored');
+      })
+      .catch(function (err) {
+        clearTimeout(timer);
+        if ((attempt || 0) < 1) {
+          console.log('[pb-acct] restore-retry ' + (err && err.message ? err.message : err));
+          setTimeout(function () { restore(meta, (attempt || 0) + 1); }, 600);
+          return;
+        }
+        meta.d.onlineAuth = false;
+        banner('Сервер счёта недоступен. Игра офлайн. Монеты устройства на месте.');
+        console.log('[pb-acct] restore-failed ' + (err && err.message ? err.message : err));
+      });
+  }
+  window.__pbOnAcct = function (msg) {
+    var meta = window.__pbMeta;
+    if (!meta || !meta.d || !msg || msg.coins == null || !msg.token) return;
+    var kept = meta.d.coins | 0;
+    window.__pbApplyAcct(meta, msg);
+    if ((meta.d.coins | 0) !== kept) meta.d.coins = kept;
+    try { meta.save(); } catch (e) {}
+    banner('Серверный счёт ' + (msg.coins | 0) + '. На устройстве ' + kept + '. Монеты устройства не зачислены.');
+    console.log('[pb-acct] match serverCoins=' + (msg.coins | 0) + ' deviceCoins=' + kept + ' credited=false');
+  };
   window.__pbOnWelcome = function (msg) {
     var meta = window.__pbMeta;
     var f = msg && msg.features;
@@ -84,8 +149,13 @@
       banner('Этот сервер старее этой сборки. Новые счета, комнаты на 30 игроков и королевская битва на 150 здесь недоступны. Монеты устройства не уходят на сервер.');
       return;
     }
-    banner('Счёт этого сервера. Траншеи ' + f.trenchPlayers + ', королевская битва допускает ' + f.brAdmit + '. Монеты устройства не зачислены.');
-    if (meta && meta.d) link(meta).catch(function () { banner('Сервер объявил счета, но API счёта не ответил. Игра остаётся без серверного счёта.'); });
+    if (!meta || !meta.d) {
+      banner('Игра ещё не готова записать счёт.');
+      console.log('[pb-acct] no-meta');
+      return;
+    }
+    banner('Проверка серверного счёта…');
+    link(meta);
   };
   window.__pbOnOffline = function () {
     window.__pbLegacyServer = false;
@@ -94,7 +164,13 @@
   };
   function arm() {
     chip();
-    if (window.__pbMeta) window.__pbMeta.d.onlineAuth = false;
+    var tries = 0;
+    var timer = setInterval(function () {
+      if (window.__pbMeta && window.__pbMeta.d || ++tries > 40) {
+        clearInterval(timer);
+        if (window.__pbMeta && window.__pbMeta.d) restore(window.__pbMeta);
+      }
+    }, 150);
   }
   if (document.body) arm(); else document.addEventListener('DOMContentLoaded', arm);
 })();

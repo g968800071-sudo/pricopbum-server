@@ -135,7 +135,8 @@ export class Meta {
     } else if (r.mode === 'team') { coins = killCoins(r.kills) + (r.win ? (r.variant === 'moba' ? 8 : 4) : 0); xp = (r.win ? 80 : 40) + r.kills * 8; if (r.win) st.teamWins++; }
     else { coins = killCoins(r.kills) + r.classicLevels * 3; xp = 20 + r.kills * 6 + r.classicLevels * 50; st.classicLevels += r.classicLevels; }
     coins += 3 + (r.win || r.place === 1 ? 18 : 0); // r37: small coins every battle + win bonus (win ≈ 20–40) (spent on permanent legendary mods)
-    if (r.online) { coins = Math.round(coins * 1); xp = Math.round(xp * 1.2); }
+    // Online matches pay the server ledger only. Device coins stay where they were.
+    if (r.online) { xp = Math.round(xp * 1.2); coins = 0; }
     if (r.rew && r.rew !== 1) { coins = Math.round(coins * r.rew); xp = Math.round(xp * r.rew); }
     const missionsDone = [];
     missionsDone.push(...this.progress('kills', r.kills), ...this.progress('damage', Math.round(r.damage)), ...this.progress('matches', 1), ...this.progress('pickups', r.pickups || 0), ...this.progress('crates', r.crates || 0));

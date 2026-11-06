@@ -83,7 +83,8 @@ jobs:
           PY
           UDID=$(cat /tmp/sim-udid.txt)
           xcrun simctl boot "$UDID" || true
-          xcrun simctl bootstatus "$UDID" -b
+          # bootstatus can wait forever if the simulator never reports a boot. Cap it.
+          perl -e 'alarm 120; exec @ARGV' xcrun simctl bootstatus "$UDID" -b
           APP="$GITHUB_WORKSPACE/ios-derived/Build/Products/Debug-iphonesimulator/App.app"
           xcrun simctl install "$UDID" "$APP"
           xcrun simctl launch "$UDID" studio.pricop.pricopbum | tee "$GITHUB_WORKSPACE/ios-report/launch.txt"
