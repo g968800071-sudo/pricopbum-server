@@ -10,15 +10,28 @@ import { roomOpts, admitCount, serverFeatures } from '../server/server.js';
 test('battle royale room options admit 150 and do not treat that as a human trial', () => {
   const features = serverFeatures();
   assert.equal(admitCount('br'), 150);
+  assert.equal(admitCount('brg'), 150);
   assert.equal(admitCount('trench'), 30);
+  assert.equal(admitCount('team'), 20);
   assert.equal(roomOpts('br', 150, {}).opts.total, 150);
   assert.equal(roomOpts('br', 1, {}).opts.total, 150);
+  assert.equal(roomOpts('brg', 1, {}).opts.total, 150);
+  assert.equal(roomOpts('brg', 1, {}).opts.giant, true);
+  assert.equal(roomOpts('brg', 1, {}).opts.mapSize, 600);
+  assert.equal(features.brGiantAdmit, 150);
   assert.equal(features.brAdmit, 150);
   assert.equal(features.brGoal, 150);
   assert.equal(features.brGoalVerified, false);
   assert.equal(features.hostedTournament, true);
   assert.equal(features.payments, false);
   assert.equal(features.accounts, true);
+});
+
+test('a giant battle royale world on this server build contains 150 tanks', async () => {
+  const { World } = await import('../src/sim/sim.js');
+  const world = new World({ mode: 'br', seed: 3, giant: true, mapSize: 600, total: 150, terrain: 1, players: [{ name: 'A', cid: 'a' }], countdown: 0 });
+  assert.equal(world.tanks.length, 150);
+  assert.ok(world.map.w >= 600);
 });
 
 test('150 simulated clients hold one battle royale without retaining snapshots', async () => {

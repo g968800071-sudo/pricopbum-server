@@ -1,4 +1,4 @@
-const C='pricopbum-mw4tiqf0';const A=['./','index.html','game.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','splash.png'];
+const C='pricopbum-mw4vv50v';const A=['./','index.html','game.js','manifest.webmanifest','icons/icon-192.png','icons/icon-512.png','splash.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(A.map(x=>new Request(x,{cache:'reload'})))).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(k=>{const old=k.filter(x=>x!==C);return Promise.all(old.map(x=>caches.delete(x))).then(()=>self.clients.claim()).then(()=>{if(old.length)return self.clients.matchAll({type:'window'}).then(cs=>cs.forEach(c=>{try{c.navigate(c.url)}catch(_){}}))})}))});
 self.addEventListener('message',e=>{if(e.data==='skip')self.skipWaiting()});

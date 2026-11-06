@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import WebKit
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -46,4 +47,49 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+}
+
+class PbBridgeViewController: CAPBridgeViewController, WKScriptMessageHandler {
+    private var storeInstalled = false
+    private var reloadedForStore = false
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        installStore()
+        if !reloadedForStore {
+            reloadedForStore = true
+            webView?.reload()
+        }
+    }
+
+    override open func capacitorDidLoad() {
+        super.capacitorDidLoad()
+        installStore()
+    }
+
+    func installStore() {
+        guard let webView = self.webView, !storeInstalled else { return }
+        storeInstalled = true
+        let raw = UserDefaults.standard.dictionary(forKey: "pbStore") as? [String: String] ?? [:]
+        let data = (try? JSONSerialization.data(withJSONObject: raw, options: [])) ?? Data("{}".utf8)
+        let json = String(data: data, encoding: .utf8) ?? "{}"
+        let probe = ProcessInfo.processInfo.arguments.contains("-pbProbe")
+        let source = "window.__pbBootStore=\(json);window.__pbProbe=\(probe ? "true" : "false");"
+        webView.configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
+        webView.configuration.userContentController.add(self, name: "pbStore")
+    }
+
+    func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "pbStore" else { return }
+        var key = ""
+        var value = ""
+        if let body = message.body as? [String: Any] {
+            key = body["key"] as? String ?? ""
+            value = body["value"] as? String ?? ""
+        }
+        if key.isEmpty { return }
+        var store = UserDefaults.standard.dictionary(forKey: "pbStore") as? [String: String] ?? [:]
+        if value.isEmpty { store.removeValue(forKey: key) } else { store[key] = value }
+        UserDefaults.standard.set(store, forKey: "pbStore")
+    }
 }

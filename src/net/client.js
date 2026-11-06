@@ -80,11 +80,12 @@ export class RemoteSession {
   }
   update(dt, inp) {
     const evs = []; for (const s of this.pending) this.view.apply(s, evs); this.pending.length = 0; this.view.smooth(dt);
+    if (this.opts.watch) return evs;
     this.inT += dt; const key = [inp.mx.toFixed(2), inp.my.toFixed(2), inp.aim ? 1 : 0, (inp.ax || 0).toFixed(2), (inp.ay || 0).toFixed(2), inp.fire ? 1 : 0, inp.an || 0].join();
     if (this.inT > 1 / 30 && (key !== this.lastSent || this.inT > 0.25)) { this.inT = 0; this.lastSent = key; this.tr.send({ t: 'in', mx: inp.mx, my: inp.my, ax: inp.ax, ay: inp.ay, aim: inp.aim, fire: inp.fire, an: inp.an || 0, act: inp.act || null }); }
     return evs;
   }
-  leave() { this.tr.send({ t: 'leave' }); }
+  leave() { this.tr.send({ t: this.opts.watch ? 'tourUnwatch' : 'leave' }); }
   requeue() {}
   destroy() { this.tr.handlers = this.tr.handlers.filter(h => h !== this.off); }
 }
@@ -112,7 +113,9 @@ export class NetClient {
       else if (m.t === 'lobby') { this.players = m.players; if (this.status === 'online') this.app.ui.setNetStatus(); }
       else if (m.t === 'queue') { this.status = 'queue'; this.showQueue(m); }
       else if (m.t === 'rj') this.rejoinToken = m.token;
-      else if (m.t === 'start') { this._rj = 0; this.closeQueue(); this.status = 'online'; this.app.startSession(new RemoteSession(this.app, tr, m)); }
+      else if (m.t === 'start') { this._rj = 0; this.watching = false; this.closeQueue(); this.status = 'online'; this.app.startSession(new RemoteSession(this.app, tr, m)); }
+      else if (m.t === 'watch') { this.watching = true; const sess = new RemoteSession(this.app, tr, m, { watch: true }); sess.extra = { spec: true, watch: true }; this.app.startSession(sess); }
+      else if (m.t === 'watchEnd') { this.watching = false; }
       else if (m.t === 'room') { this.room = m; this.app.ui.roomLobby(m); }
       else if (m.t === 'roomGone') { this.room = null; this.app.ui.closeRoom(); if (m.msg) this.app.ui.toast(m.msg, 'info'); }
       else if (m.t === 'roomChat') { this.app.ui.roomChatMsg(m); }

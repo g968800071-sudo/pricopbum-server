@@ -24,8 +24,8 @@ const MAX_TANKS = +process.env.MAX_TANKS || 24, NET_HZ = +process.env.NET_HZ || 
 // Battle royale and its constructor variants are a 150-human room. Other modes stay on MAX_TANKS.
 const BR_CAP = 150;
 const CAP = { moba: 10, br: BR_CAP, brg: 100, cbr: BR_CAP, cbr2: BR_CAP, cbr3: BR_CAP, cbr4: BR_CAP, cbr5: BR_CAP, cbr20: BR_CAP, ffa: 30, team: 20, team20: 40, arena: 6, duel: 2, koth: 10, sniper: 10, ctf: 10, hunt: 6, trench: 30, race: 8, survival: 8, zombie: 8, boss: 8, coop: 4 };
-export function isBr150(variant) { return variant === 'br' || (typeof variant === 'string' && variant.startsWith('cbr')); }
-// How many humans a room may actually start. Trenches stays 15×15. Giant BR stays on MAX_TANKS.
+export function isBr150(variant) { return variant === 'br' || variant === 'brg' || (typeof variant === 'string' && variant.startsWith('cbr')); }
+// How many humans a room may actually start. Trenches stays 15×15. Standard and giant battle royale both admit 150 on this server. Other modes stay on MAX_TANKS.
 export function admitCount(variant) {
   const listed = CAP[variant] || MAX_TANKS;
   if (variant === 'trench') return listed;
@@ -53,7 +53,7 @@ export function roomOpts(variant, n, cfg) {
   if (variant === 'br' || variant === 'brg') o.terrain = 1; // r37: hills & craters in the big BR
   if (variant === 'trench') { o.map = V.opts.map; delete o.custom; o.mapW = 220; o.mapH = 130; o.timeLimit = cfg.time || 900; o.target = V.opts.target; } // r37 «Траншеи»: fixed 220×130 map, 15 min, most kills wins
   if (variant === 'hunt') { o.map = V.opts.map; delete o.custom; o.mapW = 120; o.mapH = 80; o.perTeam = 5; o.timeLimit = 600; o.target = V.opts.target; } // r36 «Охота»: fixed BUGA.BUM, 1 target + 5 hunters, 10 min
-  // Battle royale may fill to BR_CAP. Every other counted room stays within MAX_TANKS.
+  // Standard and giant battle royale fill to BR_CAP. Every other counted room stays within MAX_TANKS.
   if (o.total) o.total = Math.min(Math.max(n, o.total), isBr150(variant) ? BR_CAP : MAX_TANKS);
   if (o.perTeam) o.perTeam = Math.max(Math.ceil(n / 2), Math.min(o.perTeam, MAX_TANKS >> 1));
   if (variant === 'trench') o.perTeam = 15; // 15×15 = 30 tanks.
@@ -89,7 +89,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods
 function sendJson(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS }); res.end(b); }
 function getAccountSafe(token) { return getAccount(accounts, token) || { ok: false }; }
 export function serverFeatures() {
-  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGoal: 150, brGoalVerified: false, hostedTournament: true, tourSizes: [2, 4, 8], tourPracticeBots: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.2.1' };
+  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGiantAdmit: admitCount('brg'), brGoal: 150, brGoalVerified: false, hostedTournament: true, tourWatch: true, tourSizes: [2, 4, 8], tourPracticeBots: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.2.2' };
 }
 function applyAccountTmod(c) {
   if (!c.hello) return;
@@ -102,6 +102,14 @@ function applyAccountTmod(c) {
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (req.method === 'OPTIONS' && u.pathname.startsWith('/api/')) { res.writeHead(204, { ...CORS, 'access-control-max-age': '600' }); return res.end(); }
+  if (process.env.PB_PROBE === '1' && u.pathname === '/probe' && req.method === 'POST') {
+    readBody(req).then((body) => {
+      const safe = { stage: String(body.stage || '').slice(0, 40), auth: !!body.auth, coins: body.coins | 0, serverCoins: body.serverCoins | 0, payments: body.payments === true, tanks: body.tanks | 0, watch: !!body.watch, moved: !!body.moved, menu: String(body.menu || '').slice(0, 180), build: String(body.build || '').slice(0, 16) };
+      try { fs.appendFileSync(process.env.PB_PROBE_LOG || '/tmp/pb-probe.jsonl', JSON.stringify(safe) + '\n'); } catch (e) {}
+      sendJson(res, 200, { ok: true });
+    }).catch(() => sendJson(res, 400, { ok: false }));
+    return;
+  }
   if (u.pathname === '/api/capabilities') return sendJson(res, 200, serverFeatures());
   if (u.pathname === '/api/account' && req.method === 'GET') return sendJson(res, 200, getAccountSafe(u.searchParams.get('token')));
   if (u.pathname === '/api/account' && req.method === 'POST') { readBody(req).then((body) => { const acc = createAccount(accounts, { token: body.token, name: body.name, local: body.local }); sendJson(res, 200, acc); }).catch(() => sendJson(res, 400, { ok: false })); return; }
@@ -153,18 +161,56 @@ wss.on('connection', (ws, req) => {
     else if (m.t === 'roomStart') { const r = c.priv; if (!r || r.owner !== c.id) return; if (rooms.size >= MAX_ROOMS) return send(c, { t: 'err', msg: 'Сервер заполнен, попробуйте позже' });
       const notReady = [...r.members.values()].filter(x => x.id !== r.owner && !x.ready).length; if (notReady && !m.force) return send(c, { t: 'err', msg: 'Не все игроки готовы: ' + notReady });
       codes.delete(r.code); const mem = [...r.members.values()].slice(0, admitCount(r.cfg.variant)); for (const x of mem) { x.priv = null; x.ready = false; } startRoom(r.cfg.variant, mem, r.code, r.cfg); }
-    else if (m.t === 'in') { if (c.room) c.room.host.setInput(c.id, m); }
+    else if (m.t === 'in') { if (c.watching) return; if (c.room) c.room.host.setInput(c.id, m); }
     else if (m.t === 'leave') leaveRoom(c);
     else if (m.t === 'bindAcct') { c.accountToken = validToken(m.token); applyAccountTmod(c); send(c, { t: 'acctBound', ok: !!c.accountToken }); }
     else if (m.t === 'tourJoin') tourney.join(c, m.size);
     else if (m.t === 'tourReady') tourney.ready(c);
     else if (m.t === 'tourLeave') tourney.leave(c);
     else if (m.t === 'tourRejoin') { if (!tourney.rejoin(c, m.token)) send(c, { t: 'err', msg: 'Турнир уже закончился' }); }
+    else if (m.t === 'tourWatch') beginWatch(c);
+    else if (m.t === 'tourUnwatch') endWatch(c);
   });
-  ws.on('close', () => { leaveQueue(c); leavePrivate(c); if (tourney) tourney.drop(c); if (!armRejoin(c)) leaveRoom(c); clients.delete(c.id); lobbyInfo(); });
+  ws.on('close', () => { leaveQueue(c); leavePrivate(c); detachWatch(c); if (tourney) tourney.drop(c); if (!armRejoin(c)) leaveRoom(c); clients.delete(c.id); lobbyInfo(); });
 });
 function leaveQueue(c) { for (const k of Object.keys(queues)) { const i = queues[k].indexOf(c); if (i >= 0) queues[k].splice(i, 1); } }
 function leaveRoom(c) { if (!c.room) return; c.room.host.removePlayer(c.id); c.room.members.delete(c.id); c.room = null; }
+function resumeOwn(c) {
+  if (!c.room || !c.room.host) return;
+  const hs = c.room.host.clients.get(c.id);
+  if (hs && hs.tank) send(c, startMsg(c.room.host.world, hs.tank.id));
+}
+function detachWatch(c) {
+  if (!c.watching) return;
+  const room = c.watching;
+  c.watching = null;
+  if (room.host) room.host.removeWatcher(c);
+}
+function endWatch(c) {
+  detachWatch(c);
+  send(c, { t: 'watchEnd' });
+  resumeOwn(c);
+}
+function beginWatch(c) {
+  const room = tourney && tourney.otherRoom(c);
+  if (!room) return send(c, { t: 'err', msg: 'Другой бой уже закончился' });
+  detachWatch(c);
+  c.watching = room;
+  const focus = room.host.world.tanks.find(t => t.alive) || room.host.world.tanks[0];
+  room.host.addWatcher(c, (snap) => { if (c.watching === room) send(c, snap); });
+  send(c, { ...startMsg(room.host.world, focus ? focus.id : 0), t: 'watch', readOnly: true });
+}
+function releaseWatchers(room) {
+  const list = room.host && room.host.watchers ? room.host.watchers.slice() : [];
+  for (const watcher of list) {
+    const c = watcher.client;
+    if (!c) continue;
+    c.watching = null;
+    send(c, { t: 'watchEnd' });
+    resumeOwn(c);
+  }
+  if (room.host) room.host.watchers = [];
+}
 
 function queueTick() {
   const now = Date.now();
@@ -253,7 +299,7 @@ export function startServer(port = PORT) {
     every(10000, () => { stepStat.max = 0; });
     every(4, () => {
       const now = process.hrtime.bigint(); acc += Number(now - last) / 1e9; last = now; if (acc > 0.25) acc = 0.25;
-      while (acc >= STEP) { acc -= STEP; const t0 = process.hrtime.bigint(); for (const r of rooms.values()) { r.host.step(STEP); if (r.host.world.result && !r.credited) { r.credited = true; creditRoom(r); if (tourney) tourney.onRoom(r); } if ((r.host.ended && r.host.endT > 15) || (r.members.size === 0 && !parkedHas(r))) { for (const c of r.members.values()) c.room = null; rooms.delete(r.id); console.log(`[room ${r.id}] closed`); } }
+      while (acc >= STEP) { acc -= STEP; const t0 = process.hrtime.bigint(); for (const r of rooms.values()) { r.host.step(STEP); if (r.host.world.result && !r.credited) { r.credited = true; creditRoom(r); if (tourney) tourney.onRoom(r); } if ((r.host.ended && r.host.endT > 15) || (r.members.size === 0 && !parkedHas(r))) { releaseWatchers(r); for (const c of r.members.values()) c.room = null; rooms.delete(r.id); console.log(`[room ${r.id}] closed`); } }
         const ms = Number(process.hrtime.bigint() - t0) / 1e6; stepStat.avg = stepStat.avg * 0.98 + ms * 0.02; stepStat.max = Math.max(stepStat.max, ms); }
     });
     every(1000, () => { queueTick(); if (tourney) tourney.sample(); });

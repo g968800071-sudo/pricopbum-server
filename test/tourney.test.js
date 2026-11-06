@@ -63,6 +63,24 @@ test('four connected players finish a hosted bracket and a dropped player can re
     cs[3] = again;
     cs.forEach(c => c.send({ t: 'tourReady' }));
     await Promise.all(cs.map(c => waitFor(c, m => m.t === 'tour' && (m.phase === 'live' || m.phase === 'done'))));
+    const before = cs[0].snaps;
+    cs[0].send({ t: 'tourWatch' });
+    const watch = await waitFor(cs[0], m => m.t === 'watch' && m.readOnly === true, 8000);
+    assert.ok(watch.roster.length >= 2);
+    const tSnap = Date.now();
+    while (cs[0].snaps <= before && Date.now() - tSnap < 8000) await new Promise(r => setTimeout(r, 50));
+    assert.ok(cs[0].snaps > before);
+    cs[0].send({ t: 'in', mx: 1, my: 0, fire: true });
+    const mark = cs[0].msgs.length;
+    cs[0].send({ t: 'tourUnwatch' });
+    const tBack = Date.now();
+    let resumed = null;
+    while (Date.now() - tBack < 8000) {
+      resumed = cs[0].msgs.slice(mark).find(m => m.t === 'start');
+      if (resumed) break;
+      await new Promise(r => setTimeout(r, 40));
+    }
+    assert.ok(resumed && resumed.roster && resumed.roster.length >= 1);
     const done = await Promise.all(cs.map(c => waitFor(c, m => m.t === 'tour' && m.phase === 'done' && m.champion, 25000)));
     const names = new Set(done[0].rounds[0].map(p => p.name));
     assert.deepEqual([...names].sort(), ['P0', 'P1', 'P2', 'P3']);

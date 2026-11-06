@@ -155,5 +155,15 @@ export function createTourneyBook({ send, startMatch, roomById }) {
     pub(T);
     return true;
   }
-  return { join, ready, leave, rejoin, drop, onRoom, sample };
+  function otherRoom(c) {
+    const hit = memberOf(c);
+    if (!hit || hit.T.phase !== 'live') return null;
+    const mine = hit.T.live.find(x => x.a.id === c.id || x.b.id === c.id);
+    const other = hit.T.live.find(x => x !== mine && x.roomId && !x.winner);
+    if (!other || !roomById) return null;
+    const room = roomById(other.roomId);
+    if (!room || !room.host || room.host.ended) return null;
+    return room;
+  }
+  return { join, ready, leave, rejoin, drop, onRoom, sample, otherRoom };
 }

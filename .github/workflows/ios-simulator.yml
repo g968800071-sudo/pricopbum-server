@@ -95,7 +95,94 @@ jobs:
           perl -e 'alarm 480; exec @ARGV' xcrun simctl bootstatus "$UDID" -b
           APP="$GITHUB_WORKSPACE/ios-derived/Build/Products/Debug-iphonesimulator/App.app"
           xcrun simctl install "$UDID" "$APP"
-          xcrun simctl launch "$UDID" studio.pricop.pricopbum | tee "$GITHUB_WORKSPACE/ios-report/launch.txt"
-          sleep 3
-          xcrun simctl spawn "$UDID" log show --last 20s --predicate 'subsystem CONTAINS "studio.pricop" OR processImagePath CONTAINS "App"' > "$GITHUB_WORKSPACE/ios-report/log.txt" || true
-          echo "launched on simulator $UDID" | tee -a "$GITHUB_WORKSPACE/ios-report/launch.txt"
+          rm -f /tmp/pb-ios-probe.sqlite /tmp/pb-probe.jsonl
+          PB_PROBE=1 PB_PROBE_LOG=/tmp/pb-probe.jsonl PORT=8799 ACCOUNT_DB=/tmp/pb-ios-probe.sqlite QUEUE_SECONDS=120 node server/server.js > "$GITHUB_WORKSPACE/ios-report/server.log" 2>&1 &
+          echo $! > /tmp/pb-ios-server.pid
+          for i in 1 2 3 4 5 6 7 8 9 10; do curl -sf http://127.0.0.1:8799/health >/dev/null && break; sleep 1; done
+          mkdir -p "$GITHUB_WORKSPACE/ios-report/shots"
+          xcrun simctl launch "$UDID" studio.pricop.pricopbum -pbProbe | tee "$GITHUB_WORKSPACE/ios-report/launch.txt"
+          (
+            for n in $(seq 1 40); do
+              xcrun simctl io "$UDID" screenshot "$GITHUB_WORKSPACE/ios-report/shots/shot-$(printf '%02d' "$n").png" >/dev/null 2>&1 || true
+              sleep 4
+            done
+          ) &
+          echo $! > /tmp/pb-shots.pid
+          python3 - << 'PY'
+          import time, pathlib
+          log = pathlib.Path('/tmp/pb-probe.jsonl')
+          need = {'menu', 'touch', 'linked'}
+          deadline = time.time() + 90
+          seen = set()
+          while time.time() < deadline and not need <= seen:
+              if log.exists():
+                  for line in log.read_text().splitlines():
+                      if '"stage"' in line:
+                          for stage in need:
+                              if f'"stage":"{stage}"' in line or f'"stage": "{stage}"' in line:
+                                  seen.add(stage)
+              time.sleep(1)
+          print('first-pass', sorted(seen))
+          if not need <= seen:
+              raise SystemExit('probe missing ' + ','.join(sorted(need - seen)))
+          PY
+          xcrun simctl io "$UDID" screenshot "$GITHUB_WORKSPACE/ios-report/shots/before-relaunch.png" || true
+          xcrun simctl terminate "$UDID" studio.pricop.pricopbum || true
+          kill "$(cat /tmp/pb-ios-server.pid)" 2>/dev/null || true
+          sleep 1
+          PB_PROBE=1 PB_PROBE_LOG=/tmp/pb-probe.jsonl PORT=8799 ACCOUNT_DB=/tmp/pb-ios-probe.sqlite QUEUE_SECONDS=120 node server/server.js >> "$GITHUB_WORKSPACE/ios-report/server.log" 2>&1 &
+          echo $! > /tmp/pb-ios-server.pid
+          for i in 1 2 3 4 5 6 7 8 9 10; do curl -sf http://127.0.0.1:8799/health >/dev/null && break; sleep 1; done
+          xcrun simctl launch "$UDID" studio.pricop.pricopbum -pbProbe | tee -a "$GITHUB_WORKSPACE/ios-report/launch.txt"
+          node --input-type=module << 'JS' &
+          import { WebSocket } from 'ws';
+          const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+          for (let i = 0; i < 80; i++) {
+            const health = await fetch('http://127.0.0.1:8799/health').then(r => r.json()).catch(() => null);
+            if (health && health.players > 0) break;
+            await sleep(500);
+          }
+          const bots = ['B1', 'B2', 'B3'].map(name => new Promise((resolve, reject) => {
+            const ws = new WebSocket('ws://127.0.0.1:8799/ws');
+            const timer = setTimeout(() => reject(new Error(name)), 30000);
+            ws.on('open', () => ws.send(JSON.stringify({ t: 'hello', v: 5, name })));
+            ws.on('message', raw => {
+              const m = JSON.parse(raw.toString());
+              if (m.t === 'welcome') ws.send(JSON.stringify({ t: 'tourJoin', size: 4 }));
+              if (m.t === 'tour' && m.phase === 'lobby' && m.members && m.members.length === 4) ws.send(JSON.stringify({ t: 'tourReady' }));
+              if (m.t === 'tour' && (m.phase === 'live' || m.phase === 'done')) { clearTimeout(timer); resolve(name); }
+            });
+          }));
+          await Promise.all(bots);
+          JS
+          python3 - << 'PY'
+          import time, pathlib
+          log = pathlib.Path('/tmp/pb-probe.jsonl')
+          need = {'restored', 'watch'}
+          deadline = time.time() + 120
+          seen = set()
+          while time.time() < deadline and not need <= seen:
+              if log.exists():
+                  for line in log.read_text().splitlines():
+                      for stage in need:
+                          if f'"stage":"{stage}"' in line or f'"stage": "{stage}"' in line:
+                              seen.add(stage)
+              time.sleep(1)
+          print('second-pass', sorted(seen))
+          text = log.read_text() if log.exists() else 'no probe log'
+          print(text.replace('token', 'redacted') if 'token' in text else text)
+          if not need <= seen:
+              raise SystemExit('probe missing ' + ','.join(sorted(need - seen)))
+          PY
+          xcrun simctl io "$UDID" screenshot "$GITHUB_WORKSPACE/ios-report/shots/after-watch.png" || true
+          kill "$(cat /tmp/pb-shots.pid)" 2>/dev/null || true
+          kill "$(cat /tmp/pb-ios-server.pid)" 2>/dev/null || true
+          cp /tmp/pb-probe.jsonl "$GITHUB_WORKSPACE/ios-report/probe.jsonl"
+          echo "launched and probed on simulator $UDID" | tee -a "$GITHUB_WORKSPACE/ios-report/launch.txt"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pricopbum-ios-probe
+          if-no-files-found: warn
+          path: ios-report

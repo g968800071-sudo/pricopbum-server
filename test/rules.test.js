@@ -186,6 +186,7 @@ test('online room options keep hills on battle royale only and cap tanks at MAX_
   assert.equal(trench.opts.mapW, 220);
   assert.equal(trench.opts.perTeam, 15);
   assert.equal(roomOpts('br', 150, {}).opts.total, 150);
+  assert.equal(roomOpts('brg', 2, {}).opts.total, 150);
   assert.equal(roomOpts('team', 20, {}).opts.perTeam <= 12, true);
   assert.equal(hunt.opts.mapW, 120);
   assert.equal(hunt.opts.timeLimit, 600);

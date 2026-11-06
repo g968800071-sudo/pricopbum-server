@@ -9,11 +9,11 @@ No signing secrets, keystores, or provisioning profiles are in this repository. 
 Built on this machine with the public Android command-line SDK (platform 35, build-tools 34/35) and JDK 21. Gradle signed it with the **debug** keystore that the Android Gradle plugin creates outside the repo (`~/.android/debug.keystore`). That file is not committed.
 
 - Project: `android/`
-- Package: `studio.pricop.pricopbum`, versionName `1.2.1`, versionCode `4`, minSdk 22, targetSdk 35
-- This is a later test than `1.2.0` (SHA256 `359ed2e8944b3d86783e66887ffa3b6d68460783a4fe47001758adefac47ce66`), `1.1.0` (SHA256 `9efecc88c152cadcb33ef1075f6cc63b0f7e881af2b12687ffd2efe324eee0fb`) and the limited `1.0` APK (SHA256 `4572a4edddad394a032f3d6731df5d403d09c955c050bda5a28be0f251221764`). The screen shows `PRICOPBUM 1.2.1 test`.
+- Package: `studio.pricop.pricopbum`, versionName `1.2.2`, versionCode `5`, minSdk 22, targetSdk 35
+- This is a later test than `1.2.1` (SHA256 `1ca0194e7cbfe82f4a19571f4241d54bbacc0a4a36a86340af7b47197645416d`), `1.2.0`, `1.1.0`, and the limited `1.0` APK. The screen shows `PRICOPBUM 1.2.2 test`.
 - Gradle output: `android/app/build/outputs/apk/debug/app-debug.apk`
-- SHA256: `1ca0194e7cbfe82f4a19571f4241d54bbacc0a4a36a86340af7b47197645416d`
-- Copy: `/opt/cursor/artifacts/pricopbum-1.2.1-debug.apk`
+- SHA256: `a057d931a89de91a9a30fd9cc54618a8a256809a1d61816a0280ca629ae318b0`
+- Copy: `/cursor/stores/self/artifacts/pricopbum-1.2.2-debug.apk`
 
 Rebuild:
 
@@ -32,7 +32,7 @@ After connect, logcat recorded `[pb-acct] linked serverCoins=0 deviceCoins=20 au
 
 ## iOS
 
-`ios/` is the Capacitor/Xcode project. This Linux machine has no Xcode, so it cannot compile the shell. `.github/workflows/ios-simulator.yml` uses the standard free `macos-latest` runner on this public repository to install CocoaPods and build an unsigned iOS Simulator `.app`. That file is not a signed iPhone app and cannot be installed on a phone.
+`ios/` is the Capacitor/Xcode project. This Linux machine has no Xcode, so it cannot compile the shell. `.github/workflows/ios-simulator.yml` uses the standard free `macos-latest` runner on this public repository. The workflow builds an unsigned iOS Simulator `.app` and is set up to launch it with `-pbProbe` and drive the real page: menu text, a touch on the stick, a throwaway server on that Mac, force-quit and relaunch, then a four-socket bracket and the read-only camera. iOS stores the account token in `UserDefaults` the same way Android uses `SharedPreferences`. The product is not a signed iPhone app and cannot be installed on a phone. The SQLite file is durable only when `ACCOUNT_DB` is on a persistent disk and `ACCOUNT_DURABLE=1`. This repo does not provision that disk.
 
 Run [42198434197](https://github.com/g968800071-sudo/pricopbum-server/actions/runs/42198434197) completed on commit `8c739c6` (macOS 26.6.2 arm64, Xcode 26.6 build 17F113) and launched that older bundle as pid 9616. Run [42204446408](https://github.com/g968800071-sudo/pricopbum-server/actions/runs/42204446408) built the 1.2.1 sources, then `simctl bootstatus` hit a 120 second cap while CoreLocation migration was still running, so that attempt did not upload. Run [42205452912](https://github.com/g968800071-sudo/pricopbum-server/actions/runs/42205452912) on commit `4eebf74` is the 1.2.1 simulator app. The runner was macOS 26.7.2 arm64 with the same Xcode 26.6 (17F113). `codesign -dv` reported an ad-hoc linker signature, `TeamIdentifier=not set`, and no sealed resources. The binary is a universal simulator Mach-O (`x86_64` and `arm64`). The copied web bundle contains build `1.2.1`. `simctl launch` started `studio.pricop.pricopbum` as pid 5274 on iPhone 17 Pro simulator `2CC7A2C1-E1A7-4633-911A-DB60BDEB97F0`. This is not an installable iPhone build.
 

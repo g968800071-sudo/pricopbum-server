@@ -4,13 +4,16 @@
   var KEY = 'pricopbum_server';
   var PROD_ORIGIN = 'https://pricopbum-server.onrender.com';
   var PROD_WS = 'wss://pricopbum-server.onrender.com/ws';
-  var BUILD = '1.2.1';
+  var BUILD = '1.2.2';
   window.__pbDurableGet = function (key) {
     try { if (window.pbStore && window.pbStore.get) { var v = window.pbStore.get(key); if (v) return String(v); } } catch (e) {}
+    try { if (window.__pbBootStore && window.__pbBootStore[key]) return String(window.__pbBootStore[key]); } catch (e) {}
     try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
   };
   window.__pbDurableSet = function (key, value) {
     try { if (window.pbStore && window.pbStore.set) window.pbStore.set(key, value || ''); } catch (e) {}
+    try { window.__pbBootStore = window.__pbBootStore || {}; if (value) window.__pbBootStore[key] = String(value); else delete window.__pbBootStore[key]; } catch (e) {}
+    try { if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pbStore) window.webkit.messageHandlers.pbStore.postMessage({ key: key, value: value || '' }); } catch (e) {}
     try { if (value) localStorage.setItem(key, value); else localStorage.removeItem(key); } catch (e) {}
   };
   function storeGet() { return (window.__pbDurableGet(KEY) || '').trim(); }

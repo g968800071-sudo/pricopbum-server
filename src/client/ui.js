@@ -7,7 +7,7 @@ import { DIFFS, SQUADS, FFA_TARGETS, ARENA_FORMATS } from '../sim/defs.js';
 import { MAPS } from '../sim/maps.js';
 import { mapPicker } from './editor.js';
 import { VNAME } from '../net/client.js';
-const ONLINE_V = [['br', 'Королевская битва · 150', 'y big'], ['brg', 'Гигантская BR · 60 мин', 'y'], ['cbr', 'Конструктор BR (своя сборка)', 'y'], ['moba', 'Оборона баз · 5 игроков в команде', 'y'], ['ffa', 'Каждый за себя'], ['team', 'Команды 10×10', 'b'], ['team20', 'Битва 20×20'], ['arena', 'Арена 3×3'], ['duel', 'Дуэль 1×1'], ['koth', 'Царь горы'], ['sniper', 'Снайперы'], ['ctf', 'Захват флага'], ['trench', 'Траншеи 15×15 · деревня', 'y'], ['hunt', 'Охота 1×5 · BUGA.BUM', 'y'], ['race', 'Танковые гонки']];
+const ONLINE_V = [['br', 'Королевская битва · 150', 'y big'], ['brg', 'Гигантская BR · 150 · 60 мин', 'y'], ['cbr', 'Конструктор BR (своя сборка)', 'y'], ['moba', 'Оборона баз · 5 игроков в команде', 'y'], ['ffa', 'Каждый за себя'], ['team', 'Команды 10×10', 'b'], ['team20', 'Битва 20×20'], ['arena', 'Арена 3×3'], ['duel', 'Дуэль 1×1'], ['koth', 'Царь горы'], ['sniper', 'Снайперы'], ['ctf', 'Захват флага'], ['trench', 'Траншеи 15×15 · деревня', 'y'], ['hunt', 'Охота 1×5 · BUGA.BUM', 'y'], ['race', 'Танковые гонки']];
 const MAPPED = ['team', 'team20', 'arena', 'duel', 'koth', 'sniper', 'ctf', 'survival', 'zombie', 'boss', 'coop'];
 const mapLabel = (d) => d.mapSel === 'custom' && d.customMap ? 'Своя' : d.mapSel == null || d.mapSel === -1 || !MAPS[d.mapSel] ? 'Случайная' : MAPS[d.mapSel].name;
 // DOM menus: main menu, garage, shop, missions, achievements, online/bluetooth, settings, results, modals.
@@ -140,7 +140,7 @@ export class UI {
     return h('div', { class: 'optsbar' },
       h('button', { class: 'opt d' + df.id, data: { a: 'diff' } }, h('small', null, 'Сложность'), df.name),
       
-      this.mode === 'br' ? h('button', { class: 'opt', data: { a: 'brsize' } }, h('small', null, 'Карта'), ['Стандарт (20 мин)', 'Гигантская (60 мин)', 'Гигантская · 150'][this.m.d.brSize || 0]) : null,
+      this.mode === 'br' ? h('button', { class: 'opt', data: { a: 'brsize' } }, h('small', null, 'Карта'), ['Стандарт · 150', 'Гигантская · 150'][this.m.d.brSize ? 1 : 0]) : null,
       this.mode === 'br' ? h('button', { class: 'opt', data: { a: 'squad' } }, h('small', null, 'Команда'), sqName[sq]) : null,
       this.mode === 'ffa' ? h('button', { class: 'opt', data: { a: 'ffaT' } }, h('small', null, 'Цель'), String(d.ffaT || 50) + ' уничт.') : null,
       this.mode === 'arena' ? h('button', { class: 'opt', data: { a: 'arenaF' } }, h('small', null, 'Формат'), ({ 1: '1×1', 2: '2×2', 3: '3×3', ffa6: 'FFA до 6' })[d.arenaF || 3]) : null,
@@ -169,7 +169,7 @@ export class UI {
       case 'arenaF': { const d = this.m.d, i = ARENA_FORMATS.indexOf(d.arenaF || 3); d.arenaF = ARENA_FORMATS[(i + 1) % ARENA_FORMATS.length]; this.m.save(); this.refreshOpts(); break; }
       case 'maps': mapPicker(this, () => this.refreshOpts()); break;
       case 'ffaT': { const d = this.m.d, i = FFA_TARGETS.indexOf(d.ffaT || 50); d.ffaT = FFA_TARGETS[(i + 1) % FFA_TARGETS.length]; this.m.save(); this.refreshOpts(); break; }
-      case 'brsize': { const d = this.m.d; d.brSize = ((d.brSize || 0) + 1) % 3; this.m.save(); this.refreshOpts(); this.toast(['Стандартная карта · 150 танков', 'Гигантская карта 600×600 · отдельный лимит сервера', 'Гигантская карта · отдельный лимит сервера'][d.brSize], 'star'); break; }
+      case 'brsize': { const d = this.m.d; d.brSize = d.brSize ? 0 : 1; this.m.save(); this.refreshOpts(); this.toast(d.brSize ? 'Гигантская карта 600×600 · 150 танков на сервере этой сборки. Старый публичный сервер этого режима не имеет.' : 'Стандартная карта · 150 танков на сервере этой сборки', 'star'); break; }
       case 'squad': { const d = this.m.d, i = SQUADS.indexOf(d.squad || 1); d.squad = SQUADS[(i + 1) % SQUADS.length]; this.m.save(); this.refreshOpts(); break; }
       case 'mode': this.mode = v; this.m.d.lastMode = v; this.m.save(); for (const e of this.el.querySelectorAll('.mode')) e.classList.toggle('sel', e.dataset.v === v); this.refreshOpts(); b.scrollIntoView({ inline: 'center', block: 'nearest' }); break;
       case 'play': if (this.mode === 'cbr') this.cbrSetup(); else this.tankSelect(() => app.startLocal(this.mode === 'br' && this.m.d.brSize ? 'brg' : this.mode)); break;
