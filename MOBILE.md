@@ -1,35 +1,38 @@
-# PRICOPBUM on phones
+# PRICOPBUM phone packages
 
-The owner asked for a landscape game with touch controls that can be installed on Android and iPhone. This repository does not contain that native packaging.
+The Android and iOS projects are a **Capacitor WebView shell** around the same `www/` game. They are not a native renderer, not a native physics port, and not a store submission. The tank game still runs as the existing JavaScript and canvas/WebGL client inside the system web view.
 
-## What is in the repo
+No signing secrets, keystores, or provisioning profiles are in this repository. `android/local.properties` and `*.keystore` are gitignored.
 
-- `www/` is the game that runs in Safari and Chrome. `manifest.webmanifest` asks for fullscreen landscape. `index.html` ships iPhone splash images and an Apple touch icon so the site can be added to the Home Screen.
-- `src/net/bluetooth.js` looks for `window.Capacitor.Plugins.PricopbumNearby`. That plugin's Java/Swift sources are not in this repo.
-- Shop and purchase buttons are drawn for a phone screen (the dialog scrolls inside the safe area). Real-money buttons now say the purchase is unavailable and do not grant the item.
+## Android debug APK
 
-Adding the site to the Home Screen is still a browser shortcut. It is not an App Store app, not a Play Store app, and not an APK.
+Built on this machine with the public Android command-line SDK (platform 35, build-tools 34/35) and JDK 21. Gradle signed it with the **debug** keystore that the Android Gradle plugin creates outside the repo (`~/.android/debug.keystore`). That file is not committed.
 
-## Android
+- Project: `android/`
+- Gradle output: `android/app/build/outputs/apk/debug/app-debug.apk`
+- Copy used for this run: `/opt/cursor/artifacts/pricopbum-debug.apk` (about 8.6 MB)
 
-Not buildable from this checkout:
+Rebuild:
 
-- no `android/` project
-- no Gradle files
-- no Capacitor or Cordova config
-- no signing keystore
-- no APK or AAB artifact
+```bash
+# Android SDK required. sdk.dir goes in android/local.properties (not committed).
+cd android && ./gradlew assembleDebug
+```
 
-An APK would need those sources plus the Android SDK. This environment does not have them, and this change does not invent a replacement app.
+Install the debug APK with `adb install -r app-debug.apk` on a device that allows debug installs. This is not a Play Store package. It does not enable Google Play Billing. Real-money buttons inside the WebView still refuse the purchase.
+
+The WebView loads the bundled site. Online play uses the server address already in the game (the public host, or the page host when you open the site in a browser). Offline battles use the simulation shipped in `www/game.js`.
 
 ## iOS
 
-Not buildable from this checkout:
+`ios/` is the Capacitor/Xcode project. CocoaPods is not installed in this Linux environment, and Xcode is not available, so **no iPhone executable and no IPA was produced**.
 
-- no `ios/` project and no Xcode project
-- no signing certificate, provisioning profile or App Store Connect setup
-- no macOS toolchain here (Xcode only runs on macOS)
+On a Mac, later:
 
-What would be required later, on a Mac, once a native project actually exists: open the Xcode project, set the bundle id, select a paid Apple Developer team, archive, and upload. None of that can be done from this Linux checkout, and there is no iOS source tree to archive.
+```bash
+cd ios/App
+pod install
+open App.xcworkspace
+```
 
-Until that project exists, iPhone players use Safari in landscape. The page rotates a portrait browser into a landscape view. That is still the website.
+Then select your Apple Developer team, set a bundle id if you change `studio.pricop.pricopbum`, and archive. Signing certificates stay on that Mac. Do not commit them.

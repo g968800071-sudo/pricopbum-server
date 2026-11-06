@@ -6,13 +6,17 @@
   "main": "server/server.js",
   "scripts": {
     "start": "node server/server.js",
-    "test": "node --test test/rules.test.js",
+    "test": "node --test --test-timeout 90000 test/*.test.js",
     "smoke": "node test/smoke.js"
   },
   "engines": {
     "node": ">=18"
   },
   "dependencies": {
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/cli": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
+    "@capacitor/ios": "^6.2.0",
     "ws": "^8.22.1"
   }
 }

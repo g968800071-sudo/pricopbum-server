@@ -184,7 +184,8 @@ test('online room options keep hills on battle royale only and cap tanks at MAX_
   assert.ok(br.opts.total <= 24);
   assert.equal(trench.opts.timeLimit, 900);
   assert.equal(trench.opts.mapW, 220);
-  assert.ok(trench.opts.perTeam <= 12, 'default online cap is 24 tanks, so trench is not a full 15v15 on this server');
+  assert.equal(trench.opts.perTeam, 15);
+  assert.ok(br.opts.total <= 24, 'battle royale stays on the 24-tank online cap; 150 players are not enabled');
   assert.equal(hunt.opts.mapW, 120);
   assert.equal(hunt.opts.timeLimit, 600);
 });

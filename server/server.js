@@ -13,6 +13,7 @@ import { VARIANTS } from '../src/sim/defs.js';
 import { MAPS, decodeMap } from '../src/sim/maps.js';
 import { buildValid, MODELS } from '../src/sim/models.js';
 import { normLoadout } from '../src/sim/loadout.js';
+import { openStore, defaultDbFile, createAccount, getAccount, spendLegendary, creditMatch, validToken, tmodForModel } from '../src/account/store.js';
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 const WWW = path.resolve(__dir, '../www');
@@ -20,7 +21,7 @@ const PORT = +process.env.PORT || 8080, QUEUE_SECONDS = +(process.env.QUEUE_SECO
 // r31: cheap defaults for Render free (0.1 CPU): cap tanks per online room and send 15 snapshots/s. Override with MAX_TANKS / NET_HZ.
 const MAX_TANKS = +process.env.MAX_TANKS || 24, NET_HZ = +process.env.NET_HZ || 15;
 // max humans per room; free slots are filled with bots
-const CAP = { moba: 10, br: 100, brg: 100, cbr: 100, cbr2: 100, cbr3: 100, cbr4: 100, cbr5: 100, cbr20: 100, ffa: 30, team: 20, team20: 40, arena: 6, duel: 2, koth: 10, sniper: 10, ctf: 10, hunt: 6, trench: 24, race: 8, survival: 8, zombie: 8, boss: 8, coop: 4 };
+const CAP = { moba: 10, br: 100, brg: 100, cbr: 100, cbr2: 100, cbr3: 100, cbr4: 100, cbr5: 100, cbr20: 100, ffa: 30, team: 20, team20: 40, arena: 6, duel: 2, koth: 10, sniper: 10, ctf: 10, hunt: 6, trench: 30, race: 8, survival: 8, zombie: 8, boss: 8, coop: 4 };
 const MAP_SIZES = { arena: [72, 48], duel: [72, 48], koth: [110, 72], sniper: [110, 72], ctf: [100, 64], hunt: [120, 80], trench: [220, 130] };
 export function roomOpts(variant, n, cfg) {
   const V = VARIANTS[variant]; const o = { ...V.opts, variant }; cfg = cfg || {};
@@ -42,6 +43,7 @@ export function roomOpts(variant, n, cfg) {
   if (variant === 'trench') { o.map = V.opts.map; delete o.custom; o.mapW = 220; o.mapH = 130; o.timeLimit = cfg.time || 900; o.target = V.opts.target; } // r37 «Траншеи»: fixed 220×130 map, 15 min, most kills wins
   if (variant === 'hunt') { o.map = V.opts.map; delete o.custom; o.mapW = 120; o.mapH = 80; o.perTeam = 5; o.timeLimit = 600; o.target = V.opts.target; } // r36 «Охота»: fixed BUGA.BUM, 1 target + 5 hunters, 10 min
   if (o.total) o.total = Math.max(n, Math.min(o.total, MAX_TANKS)); if (o.perTeam) o.perTeam = Math.max(Math.ceil(n / 2), Math.min(o.perTeam, MAX_TANKS >> 1));
+  if (variant === 'trench') o.perTeam = 15; // 15×15 = 30 tanks. The general MAX_TANKS cap still limits battle royale. 150 players are not enabled.
   return { mode: V.mode, opts: o };
 }
 const ROOM_VARIANTS = Object.keys(CAP);
@@ -61,9 +63,29 @@ function roomBroadcast(r) { const m = roomInfo(r); for (const c of r.members.val
 function leavePrivate(c, msg) { const r = c.priv; if (!r) return; r.members.delete(c.id); c.priv = null; send(c, { t: 'roomGone', msg });
   if (!r.members.size) codes.delete(r.code); else { if (r.owner === c.id) r.owner = r.members.keys().next().value; roomBroadcast(r); } }
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.svg': 'image/svg+xml', '.woff2': 'font/woff2', '.css': 'text/css' };
+const accounts = openStore(defaultDbFile());
+function readBody(req, limit = 65536) {
+  return new Promise((resolve, reject) => {
+    const chunks = []; let n = 0;
+    req.on('data', (c) => { n += c.length; if (n > limit) { reject(new Error('too big')); req.destroy(); } else chunks.push(c); });
+    req.on('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')); } catch { resolve({}); } });
+    req.on('error', reject);
+  });
+}
+function sendJson(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(b); }
+function getAccountSafe(token) { return getAccount(accounts, token) || { ok: false }; }
+function applyAccountTmod(c) {
+  if (!c.accountToken || !c.hello) return;
+  const M = MODELS[c.hello.model];
+  if (!M || M.rar >= 4) { c.hello.tmod = null; return; }
+  if (M.rar === 3) c.hello.tmod = tmodForModel(accounts, c.accountToken, M.id);
+}
 
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
+  if (u.pathname === '/api/account' && req.method === 'GET') return sendJson(res, 200, getAccountSafe(u.searchParams.get('token')));
+  if (u.pathname === '/api/account' && req.method === 'POST') { readBody(req).then((body) => { const acc = createAccount(accounts, { token: body.token, name: body.name, local: body.local }); sendJson(res, 200, acc); }).catch(() => sendJson(res, 400, { ok: false })); return; }
+  if (u.pathname === '/api/account/spend' && req.method === 'POST') { readBody(req).then((body) => sendJson(res, 200, spendLegendary(accounts, body.token, body.model, body.track))).catch(() => sendJson(res, 400, { ok: false })); return; }
   if (u.pathname === '/privacy' || u.pathname === '/privacy/') { try { const b = fs.readFileSync(path.join(WWW, 'privacy.html')); res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(b); } catch (e) { res.writeHead(404); return res.end('not found'); } }
   if (u.pathname === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('PRICOPBUM server OK'); }
   if (u.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, players: clients.size, rooms: rooms.size, privateRooms: codes.size, stepMs: +stepStat.avg.toFixed(3), stepMaxMs: +stepStat.max.toFixed(3), maxTanks: MAX_TANKS, netHz: NET_HZ, list: [...rooms.values()].map(r => ({ id: r.id, variant: r.mode, humans: r.members.size, tanks: r.host.world.tanks.length, alive: r.host.world.tanks.filter(t => t.alive).length })) })); }
@@ -87,13 +109,13 @@ wss.on('connection', (ws, req) => {
     const now = Date.now(); if (now - c.win > 1000) { c.win = now; c.msgs = 0; } if (++c.msgs > 90) return; // rate limit
     let m; try { m = JSON.parse(data); } catch (e) { return; } if (!m || typeof m.t !== 'string') return;
     if (m.t === 'rejoin') return adoptRejoin(c, m.token);
-    if (m.t === 'hello') { if (m.v !== PROTO) return send(c, { t: 'err', msg: 'Обновите игру: версия протокола отличается' }); const tlv = Number.isInteger(+m.tlv) && +m.tlv >= 1 && +m.tlv <= 20 ? (+m.tlv | 0) : undefined; c.hello = { name: sanitizeName(m.name), cc: (typeof m.cc === 'string' && /^[A-Z]{2}$/.test(m.cc)) ? m.cc : undefined, skin: m.skin, weapon: m.weapon, lv: m.lv, tlv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; send(c, { t: 'welcome', id: c.id, players: clients.size }); lobbyInfo(); }
-    else if (m.t === 'qm') { if (!c.hello || c.room) return; const mode = CAP[m.mode] ? m.mode : 'br'; leavePrivate(c); leaveQueue(c); c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; c.mode = mode; queues[mode].push(c); if (queues[mode].length === 1) queueStart[mode] = Date.now(); queueTick(); }
+    if (m.t === 'hello') { if (m.v !== PROTO) return send(c, { t: 'err', msg: 'Обновите игру: версия протокола отличается' }); const tlv = Number.isInteger(+m.tlv) && +m.tlv >= 1 && +m.tlv <= 20 ? (+m.tlv | 0) : undefined; c.accountToken = validToken(m.acct); c.hello = { name: sanitizeName(m.name), cc: (typeof m.cc === 'string' && /^[A-Z]{2}$/.test(m.cc)) ? m.cc : undefined, skin: m.skin, weapon: m.weapon, lv: m.lv, tlv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; applyAccountTmod(c); send(c, { t: 'welcome', id: c.id, players: clients.size, acct: !!c.accountToken }); lobbyInfo(); }
+    else if (m.t === 'qm') { if (!c.hello || c.room) return; const mode = CAP[m.mode] ? m.mode : 'br'; leavePrivate(c); leaveQueue(c); c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; applyAccountTmod(c); c.mode = mode; queues[mode].push(c); if (queues[mode].length === 1) queueStart[mode] = Date.now(); queueTick(); }
     else if (m.t === 'cancel') leaveQueue(c);
-    else if (m.t === 'create') { if (!c.hello || c.room) return; leaveQueue(c); leavePrivate(c); const variant = CAP[m.variant] ? m.variant : 'team'; c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) };
+    else if (m.t === 'create') { if (!c.hello || c.room) return; leaveQueue(c); leavePrivate(c); const variant = CAP[m.variant] ? m.variant : 'team'; c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; applyAccountTmod(c);
       const r = { code: newCode(), cfg: normCfg(m.cfg || {}, { ...DEF_CFG, variant }), owner: c.id, members: new Map([[c.id, c]]), created: Date.now() }; codes.set(r.code, r); c.priv = r; roomBroadcast(r); }
     else if (m.t === 'join') { if (!c.hello || c.room) return; const r = codes.get(String(m.code || '').toUpperCase()); if (!r) return send(c, { t: 'err', msg: 'Комната с таким кодом не найдена' });
-      if (r.members.size >= CAP[r.cfg.variant]) return send(c, { t: 'err', msg: 'Комната заполнена' }); if (r.kicked && r.kicked.has(c.id)) return send(c, { t: 'err', msg: 'Создатель комнаты исключил вас' }); leaveQueue(c); leavePrivate(c); c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; r.members.set(c.id, c); c.priv = r; roomBroadcast(r); }
+      if (r.members.size >= CAP[r.cfg.variant]) return send(c, { t: 'err', msg: 'Комната заполнена' }); if (r.kicked && r.kicked.has(c.id)) return send(c, { t: 'err', msg: 'Создатель комнаты исключил вас' }); leaveQueue(c); leavePrivate(c); c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; applyAccountTmod(c); r.members.set(c.id, c); c.priv = r; roomBroadcast(r); }
     else if (m.t === 'roomTeam') { const r = c.priv; if (!r) return; c.team = m.team === 0 || m.team === 1 ? m.team : null; roomBroadcast(r); }
     else if (m.t === 'roomVariant') { const r = c.priv; if (!r || r.owner !== c.id || !CAP[m.variant]) return; r.cfg.variant = m.variant; roomBroadcast(r); }
     else if (m.t === 'roomCfg') { const r = c.priv; if (!r || r.owner !== c.id || !m.cfg) return; r.cfg = normCfg(m.cfg, r.cfg); for (const x of r.members.values()) if (x.id !== r.owner) x.ready = false; roomBroadcast(r); }
@@ -143,7 +165,7 @@ function adoptRejoin(c, token) {
   room.wire.delete(old.id); room.members.delete(old.id);
   room.wire.set(c.id, c); room.members.set(c.id, c);
   room.host.clients.delete(old.id); room.host.clients.set(c.id, hs); hs.tank.cid = c.id;
-  c.room = room; c.hello = old.hello; c.rejoinToken = old.rejoinToken; c.suspended = false; c.mode = old.mode;
+  c.room = room; c.hello = old.hello; c.accountToken = old.accountToken; c.rejoinToken = old.rejoinToken; c.suspended = false; c.mode = old.mode;
   old.room = null; old.suspended = false;
   send(c, startMsg(room.host.world, hs.tank.id));
   send(c, { t: 'rj', token: c.rejoinToken, ms: REJOIN_MS });
@@ -168,13 +190,26 @@ let last = process.hrtime.bigint(), acc = 0; const STEP = 1 / 60; const stepStat
 let loopsOn = false;
 const timers = [];
 const every = (ms, fn) => { const id = setInterval(fn, ms); timers.push(id); return id; };
+function creditRoom(room) {
+  const w = room.host.world, res = w.result || {};
+  for (const cl of room.wire.values()) {
+    if (!cl.accountToken) continue;
+    const hs = room.host.clients.get(cl.id), tank = hs && hs.tank;
+    if (!tank) continue;
+    const win = w.mode === 'team' ? res.winnerTeam === tank.team : w.mode === 'br' ? (res.winner === tank.id || tank.place === 1) : !!res.win;
+    const summary = { mode: w.mode, variant: w.opts.variant || w.special || null, kills: tank.kills | 0, place: tank.place || 0, total: w.tanks.length, win, rew: w.diff ? w.diff.rew : 1, online: true };
+    const acc = creditMatch(accounts, cl.accountToken, 'room-' + room.id, summary);
+    if (acc) send(cl, { t: 'acct', ...acc });
+  }
+}
 export function startServer(port = PORT) {
+  shuttingDown = false;
   if (!loopsOn) {
     loopsOn = true;
     every(10000, () => { stepStat.max = 0; });
     every(4, () => {
       const now = process.hrtime.bigint(); acc += Number(now - last) / 1e9; last = now; if (acc > 0.25) acc = 0.25;
-      while (acc >= STEP) { acc -= STEP; const t0 = process.hrtime.bigint(); for (const r of rooms.values()) { r.host.step(STEP); if ((r.host.ended && r.host.endT > 15) || (r.members.size === 0 && !parkedHas(r))) { for (const c of r.members.values()) c.room = null; rooms.delete(r.id); console.log(`[room ${r.id}] closed`); } }
+      while (acc >= STEP) { acc -= STEP; const t0 = process.hrtime.bigint(); for (const r of rooms.values()) { r.host.step(STEP); if (r.host.world.result && !r.credited) { r.credited = true; creditRoom(r); } if ((r.host.ended && r.host.endT > 15) || (r.members.size === 0 && !parkedHas(r))) { for (const c of r.members.values()) c.room = null; rooms.delete(r.id); console.log(`[room ${r.id}] closed`); } }
         const ms = Number(process.hrtime.bigint() - t0) / 1e6; stepStat.avg = stepStat.avg * 0.98 + ms * 0.02; stepStat.max = Math.max(stepStat.max, ms); }
     });
     every(1000, queueTick);
