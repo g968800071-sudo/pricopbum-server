@@ -3,12 +3,12 @@
 // It never sends an account token.
 (function () {
   if (!window.__pbProbe) return;
-  fetch('http://127.0.0.1:8799/probe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ stage: 'boot', build: window.__pbBuild || '' }) }).catch(function () {});
+  fetch('http://127.0.0.1:8799/probe', { method: 'POST', body: JSON.stringify({ stage: 'boot', build: window.__pbBuild || '' }) }).catch(function () {});
   var PORT = 8799;
   function post(body) {
     body.build = window.__pbBuild || '';
     body.payments = !!(window.__pbServerFeatures && window.__pbServerFeatures.payments === true);
-    return fetch('http://127.0.0.1:' + PORT + '/probe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).catch(function () {});
+    return fetch('http://127.0.0.1:' + PORT + '/probe', { method: 'POST', body: JSON.stringify(body) }).catch(function () {});
   }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   function pointer(type, x, y) {

@@ -101,7 +101,7 @@ function applyAccountTmod(c) {
 
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
-  if (req.method === 'OPTIONS' && u.pathname.startsWith('/api/')) { res.writeHead(204, { ...CORS, 'access-control-max-age': '600' }); return res.end(); }
+  if (req.method === 'OPTIONS' && (u.pathname.startsWith('/api/') || u.pathname === '/probe')) { res.writeHead(204, { ...CORS, 'access-control-max-age': '600' }); return res.end(); }
   if (process.env.PB_PROBE === '1' && u.pathname === '/probe' && req.method === 'POST') {
     readBody(req).then((body) => {
       const safe = { stage: String(body.stage || '').slice(0, 40), auth: !!body.auth, coins: body.coins | 0, serverCoins: body.serverCoins | 0, payments: body.payments === true, tanks: body.tanks | 0, watch: !!body.watch, moved: !!body.moved, menu: String(body.menu || '').slice(0, 180), build: String(body.build || '').slice(0, 16) };
