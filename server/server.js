@@ -22,6 +22,12 @@ const PORT = +process.env.PORT || 8080, QUEUE_SECONDS = +(process.env.QUEUE_SECO
 const MAX_TANKS = +process.env.MAX_TANKS || 24, NET_HZ = +process.env.NET_HZ || 15;
 // max humans per room; free slots are filled with bots
 const CAP = { moba: 10, br: 100, brg: 100, cbr: 100, cbr2: 100, cbr3: 100, cbr4: 100, cbr5: 100, cbr20: 100, ffa: 30, team: 20, team20: 40, arena: 6, duel: 2, koth: 10, sniper: 10, ctf: 10, hunt: 6, trench: 30, race: 8, survival: 8, zombie: 8, boss: 8, coop: 4 };
+// How many humans a room may actually start. Trenches stays 15×15. Every other mode is also limited by MAX_TANKS.
+export function admitCount(variant) {
+  const listed = CAP[variant] || MAX_TANKS;
+  if (variant === 'trench') return listed;
+  return Math.min(listed, MAX_TANKS);
+}
 const MAP_SIZES = { arena: [72, 48], duel: [72, 48], koth: [110, 72], sniper: [110, 72], ctf: [100, 64], hunt: [120, 80], trench: [220, 130] };
 export function roomOpts(variant, n, cfg) {
   const V = VARIANTS[variant]; const o = { ...V.opts, variant }; cfg = cfg || {};
@@ -42,7 +48,9 @@ export function roomOpts(variant, n, cfg) {
   if (variant === 'br' || variant === 'brg') o.terrain = 1; // r37: hills & craters in the big BR
   if (variant === 'trench') { o.map = V.opts.map; delete o.custom; o.mapW = 220; o.mapH = 130; o.timeLimit = cfg.time || 900; o.target = V.opts.target; } // r37 «Траншеи»: fixed 220×130 map, 15 min, most kills wins
   if (variant === 'hunt') { o.map = V.opts.map; delete o.custom; o.mapW = 120; o.mapH = 80; o.perTeam = 5; o.timeLimit = 600; o.target = V.opts.target; } // r36 «Охота»: fixed BUGA.BUM, 1 target + 5 hunters, 10 min
-  if (o.total) o.total = Math.max(n, Math.min(o.total, MAX_TANKS)); if (o.perTeam) o.perTeam = Math.max(Math.ceil(n / 2), Math.min(o.perTeam, MAX_TANKS >> 1));
+  // Humans already admitted cannot raise the room above MAX_TANKS. Earlier lines may set total to n for a private room.
+  if (o.total) o.total = Math.min(Math.max(n, o.total), MAX_TANKS);
+  if (o.perTeam) o.perTeam = Math.max(Math.ceil(n / 2), Math.min(o.perTeam, MAX_TANKS >> 1));
   if (variant === 'trench') o.perTeam = 15; // 15×15 = 30 tanks. The general MAX_TANKS cap still limits battle royale. 150 players are not enabled.
   return { mode: V.mode, opts: o };
 }
@@ -58,7 +66,7 @@ const DEF_CFG = { variant: 'team', map: -1, custom: null, size: 0, bots: true, d
 const codes = new Map(); // private rooms: code -> { code, variant, owner, members: Map }
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 function newCode() { for (;;) { let s = ''; for (let i = 0; i < 5; i++) s += CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]; if (!codes.has(s)) return s; } }
-function roomInfo(r) { const cfg = { ...r.cfg, custom: r.cfg.custom ? true : null }; return { t: 'room', code: r.code, variant: r.cfg.variant, cfg, owner: r.owner, cap: CAP[r.cfg.variant], members: [...r.members.values()].map(c => ({ id: c.id, name: c.hello.name, team: c.team ?? null, ready: !!c.ready || c.id === r.owner })) }; }
+function roomInfo(r) { const cfg = { ...r.cfg, custom: r.cfg.custom ? true : null }; return { t: 'room', code: r.code, variant: r.cfg.variant, cfg, owner: r.owner, cap: admitCount(r.cfg.variant), members: [...r.members.values()].map(c => ({ id: c.id, name: c.hello.name, team: c.team ?? null, ready: !!c.ready || c.id === r.owner })) }; }
 function roomBroadcast(r) { const m = roomInfo(r); for (const c of r.members.values()) send(c, { ...m, me: c.id }); }
 function leavePrivate(c, msg) { const r = c.priv; if (!r) return; r.members.delete(c.id); c.priv = null; send(c, { t: 'roomGone', msg });
   if (!r.members.size) codes.delete(r.code); else { if (r.owner === c.id) r.owner = r.members.keys().next().value; roomBroadcast(r); } }
@@ -74,21 +82,26 @@ function readBody(req, limit = 65536) {
 }
 function sendJson(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' }); res.end(b); }
 function getAccountSafe(token) { return getAccount(accounts, token) || { ok: false }; }
+export function serverFeatures() {
+  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: MAX_TANKS, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGoal: 150, brGoalVerified: false, hostedTournament: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node' };
+}
 function applyAccountTmod(c) {
-  if (!c.accountToken || !c.hello) return;
+  if (!c.hello) return;
   const M = MODELS[c.hello.model];
-  if (!M || M.rar >= 4) { c.hello.tmod = null; return; }
-  if (M.rar === 3) c.hello.tmod = tmodForModel(accounts, c.accountToken, M.id);
+  // Client-sent mod levels are not authority. Only a linked ledger can supply legendary mods. Mythic stays off.
+  if (!c.accountToken || !M || M.rar !== 3) { c.hello.tmod = null; return; }
+  c.hello.tmod = tmodForModel(accounts, c.accountToken, M.id);
 }
 
 const server = http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
+  if (u.pathname === '/api/capabilities') return sendJson(res, 200, serverFeatures());
   if (u.pathname === '/api/account' && req.method === 'GET') return sendJson(res, 200, getAccountSafe(u.searchParams.get('token')));
   if (u.pathname === '/api/account' && req.method === 'POST') { readBody(req).then((body) => { const acc = createAccount(accounts, { token: body.token, name: body.name, local: body.local }); sendJson(res, 200, acc); }).catch(() => sendJson(res, 400, { ok: false })); return; }
   if (u.pathname === '/api/account/spend' && req.method === 'POST') { readBody(req).then((body) => sendJson(res, 200, spendLegendary(accounts, body.token, body.model, body.track))).catch(() => sendJson(res, 400, { ok: false })); return; }
   if (u.pathname === '/privacy' || u.pathname === '/privacy/') { try { const b = fs.readFileSync(path.join(WWW, 'privacy.html')); res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(b); } catch (e) { res.writeHead(404); return res.end('not found'); } }
   if (u.pathname === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('PRICOPBUM server OK'); }
-  if (u.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, players: clients.size, rooms: rooms.size, privateRooms: codes.size, stepMs: +stepStat.avg.toFixed(3), stepMaxMs: +stepStat.max.toFixed(3), maxTanks: MAX_TANKS, netHz: NET_HZ, list: [...rooms.values()].map(r => ({ id: r.id, variant: r.mode, humans: r.members.size, tanks: r.host.world.tanks.length, alive: r.host.world.tanks.filter(t => t.alive).length })) })); }
+  if (u.pathname === '/health') { res.writeHead(200, { 'content-type': 'application/json' }); return res.end(JSON.stringify({ ok: true, players: clients.size, rooms: rooms.size, privateRooms: codes.size, stepMs: +stepStat.avg.toFixed(3), stepMaxMs: +stepStat.max.toFixed(3), maxTanks: MAX_TANKS, netHz: NET_HZ, features: serverFeatures(), list: [...rooms.values()].map(r => ({ id: r.id, variant: r.mode, humans: r.members.size, tanks: r.host.world.tanks.length, alive: r.host.world.tanks.filter(t => t.alive).length })) })); }
   let p = path.normalize(path.join(WWW, decodeURIComponent(u.pathname)));
   if (!p.startsWith(WWW)) { res.writeHead(403); return res.end(); }
   if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, 'index.html');
@@ -109,13 +122,13 @@ wss.on('connection', (ws, req) => {
     const now = Date.now(); if (now - c.win > 1000) { c.win = now; c.msgs = 0; } if (++c.msgs > 90) return; // rate limit
     let m; try { m = JSON.parse(data); } catch (e) { return; } if (!m || typeof m.t !== 'string') return;
     if (m.t === 'rejoin') return adoptRejoin(c, m.token);
-    if (m.t === 'hello') { if (m.v !== PROTO) return send(c, { t: 'err', msg: 'Обновите игру: версия протокола отличается' }); const tlv = Number.isInteger(+m.tlv) && +m.tlv >= 1 && +m.tlv <= 20 ? (+m.tlv | 0) : undefined; c.accountToken = validToken(m.acct); c.hello = { name: sanitizeName(m.name), cc: (typeof m.cc === 'string' && /^[A-Z]{2}$/.test(m.cc)) ? m.cc : undefined, skin: m.skin, weapon: m.weapon, lv: m.lv, tlv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; applyAccountTmod(c); send(c, { t: 'welcome', id: c.id, players: clients.size, acct: !!c.accountToken }); lobbyInfo(); }
+    if (m.t === 'hello') { if (m.v !== PROTO) return send(c, { t: 'err', msg: 'Обновите игру: версия протокола отличается' }); const tlv = Number.isInteger(+m.tlv) && +m.tlv >= 1 && +m.tlv <= 20 ? (+m.tlv | 0) : undefined; c.accountToken = validToken(m.acct); c.hello = { name: sanitizeName(m.name), cc: (typeof m.cc === 'string' && /^[A-Z]{2}$/.test(m.cc)) ? m.cc : undefined, skin: m.skin, weapon: m.weapon, lv: m.lv, tlv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; applyAccountTmod(c); send(c, { t: 'welcome', id: c.id, players: clients.size, acct: !!c.accountToken, features: serverFeatures() }); lobbyInfo(); }
     else if (m.t === 'qm') { if (!c.hello || c.room) return; const mode = CAP[m.mode] ? m.mode : 'br'; leavePrivate(c); leaveQueue(c); c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; applyAccountTmod(c); c.mode = mode; queues[mode].push(c); if (queues[mode].length === 1) queueStart[mode] = Date.now(); queueTick(); }
     else if (m.t === 'cancel') leaveQueue(c);
     else if (m.t === 'create') { if (!c.hello || c.room) return; leaveQueue(c); leavePrivate(c); const variant = CAP[m.variant] ? m.variant : 'team'; c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; applyAccountTmod(c);
       const r = { code: newCode(), cfg: normCfg(m.cfg || {}, { ...DEF_CFG, variant }), owner: c.id, members: new Map([[c.id, c]]), created: Date.now() }; codes.set(r.code, r); c.priv = r; roomBroadcast(r); }
     else if (m.t === 'join') { if (!c.hello || c.room) return; const r = codes.get(String(m.code || '').toUpperCase()); if (!r) return send(c, { t: 'err', msg: 'Комната с таким кодом не найдена' });
-      if (r.members.size >= CAP[r.cfg.variant]) return send(c, { t: 'err', msg: 'Комната заполнена' }); if (r.kicked && r.kicked.has(c.id)) return send(c, { t: 'err', msg: 'Создатель комнаты исключил вас' }); leaveQueue(c); leavePrivate(c); c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; applyAccountTmod(c); r.members.set(c.id, c); c.priv = r; roomBroadcast(r); }
+      if (r.members.size >= admitCount(r.cfg.variant)) return send(c, { t: 'err', msg: 'Комната заполнена' }); if (r.kicked && r.kicked.has(c.id)) return send(c, { t: 'err', msg: 'Создатель комнаты исключил вас' }); leaveQueue(c); leavePrivate(c); c.team = null; c.ready = false; c.hello = { ...c.hello, name: sanitizeName(m.name || c.hello.name), skin: m.skin, weapon: m.weapon, lv: m.lv, tmod: normTmod(m.tmod), model: Number.isInteger(m.model) && m.model >= 0 && m.model < 200 ? m.model : 0, build: buildValid(m.build) ? m.build : null, loadout: normLoadout(m.loadout) }; applyAccountTmod(c); r.members.set(c.id, c); c.priv = r; roomBroadcast(r); }
     else if (m.t === 'roomTeam') { const r = c.priv; if (!r) return; c.team = m.team === 0 || m.team === 1 ? m.team : null; roomBroadcast(r); }
     else if (m.t === 'roomVariant') { const r = c.priv; if (!r || r.owner !== c.id || !CAP[m.variant]) return; r.cfg.variant = m.variant; roomBroadcast(r); }
     else if (m.t === 'roomCfg') { const r = c.priv; if (!r || r.owner !== c.id || !m.cfg) return; r.cfg = normCfg(m.cfg, r.cfg); for (const x of r.members.values()) if (x.id !== r.owner) x.ready = false; roomBroadcast(r); }
@@ -125,7 +138,7 @@ wss.on('connection', (ws, req) => {
     else if (m.t === 'roomLeave') leavePrivate(c);
     else if (m.t === 'roomStart') { const r = c.priv; if (!r || r.owner !== c.id) return; if (rooms.size >= MAX_ROOMS) return send(c, { t: 'err', msg: 'Сервер заполнен, попробуйте позже' });
       const notReady = [...r.members.values()].filter(x => x.id !== r.owner && !x.ready).length; if (notReady && !m.force) return send(c, { t: 'err', msg: 'Не все игроки готовы: ' + notReady });
-      codes.delete(r.code); const mem = [...r.members.values()].slice(0, CAP[r.cfg.variant]); for (const x of mem) { x.priv = null; x.ready = false; } startRoom(r.cfg.variant, mem, r.code, r.cfg); }
+      codes.delete(r.code); const mem = [...r.members.values()].slice(0, admitCount(r.cfg.variant)); for (const x of mem) { x.priv = null; x.ready = false; } startRoom(r.cfg.variant, mem, r.code, r.cfg); }
     else if (m.t === 'in') { if (c.room) c.room.host.setInput(c.id, m); }
     else if (m.t === 'leave') leaveRoom(c);
   });
@@ -139,7 +152,8 @@ function queueTick() {
   for (const mode of Object.keys(queues)) {
     const q = queues[mode]; if (!q.length) continue;
     const startIn = QUEUE_SECONDS - (now - queueStart[mode]) / 1000;
-    if ((startIn <= 0 || q.length >= CAP[mode]) && rooms.size < MAX_ROOMS) startRoom(mode, q.splice(0, CAP[mode]));
+    const limit = admitCount(mode);
+    if ((startIn <= 0 || q.length >= limit) && rooms.size < MAX_ROOMS) startRoom(mode, q.splice(0, limit));
     else for (const c of q) send(c, { t: 'queue', mode, n: q.length, startIn });
     if (q.length) queueStart[mode] = queueStart[mode] || now;
   }
@@ -172,6 +186,7 @@ function adoptRejoin(c, token) {
   room.host.broadcast();
 }
 function startRoom(variant, members, code, cfg) {
+  members = members.slice(0, admitCount(variant));
   const id = nextRoom++; const wire = new Map(members.map(c => [c.id, c]));
   const players = members.map(c => ({ ...c.hello, cid: c.id, team: c.team ?? undefined }));
   const { mode, opts } = roomOpts(variant, members.length, cfg); if (code) opts.code = code;

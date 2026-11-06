@@ -1,6 +1,8 @@
-// Device-linked account ledger. This is a local SQLite file (ACCOUNT_DB), not localStorage and not a paid host.
-// The first link copies a device snapshot once and does not delete that snapshot. After that, online match
-// rewards and legendary upgrades are applied only here. Mythic / real-money rows are refused.
+// Device-linked account ledger in a local SQLite file (ACCOUNT_DB).
+// Spendable coins, rank and legendary mods come only from matches this process simulated and from spends it approved.
+// A device localStorage snapshot is stored as a note and is never added to that balance. The device copy is not deleted.
+// Mythic / real-money rows are refused.
+// On a host with an ephemeral disk this file disappears on restart unless ACCOUNT_DB points at a persistent disk and ACCOUNT_DURABLE=1.
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
@@ -13,7 +15,7 @@ import { rankDelta } from '../sim/rank.js';
 export function openStore(file) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
   const db = new DatabaseSync(file);
-  db.exec(`
+    db.exec(`
     CREATE TABLE IF NOT EXISTS accounts (
       token TEXT PRIMARY KEY,
       created INTEGER NOT NULL,
@@ -31,6 +33,8 @@ export function openStore(file) {
       PRIMARY KEY (token, match_key)
     );
   `);
+  const cols = db.prepare('PRAGMA table_info(accounts)').all().map(c => c.name);
+  if (!cols.includes('device_note')) db.exec("ALTER TABLE accounts ADD COLUMN device_note TEXT NOT NULL DEFAULT '{}'");
   return db;
 }
 
@@ -38,11 +42,22 @@ const TOKEN_RE = /^[A-Za-z0-9_-]{16,64}$/;
 export function validToken(s) { return typeof s === 'string' && TOKEN_RE.test(s) ? s : null; }
 
 function rowOf(db, token) {
-  return db.prepare('SELECT token, created, coins, rp, kills, matches, name, tmods, imported FROM accounts WHERE token = ?').get(token);
+  return db.prepare('SELECT token, created, coins, rp, kills, matches, name, tmods, imported, device_note FROM accounts WHERE token = ?').get(token);
 }
 function parseTmods(raw) { try { const o = JSON.parse(raw || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } }
 export function publicAccount(row) {
-  return { token: row.token, coins: row.coins, rp: row.rp, kills: row.kills, matches: row.matches, name: row.name, tmods: parseTmods(row.tmods), imported: !!row.imported, server: true };
+  let note = {};
+  try { note = JSON.parse(row.device_note || '{}') || {}; } catch { note = {}; }
+  return { token: row.token, coins: row.coins, rp: row.rp, kills: row.kills, matches: row.matches, name: row.name, tmods: parseTmods(row.tmods), imported: !!row.imported, deviceNote: note, authoritative: true, server: true };
+}
+
+// Remember that a device offered numbers, without accepting them as spendable coins or rank.
+export function deviceNote(local) {
+  if (!local || typeof local !== 'object') return { present: false };
+  const coins = Math.floor(+local.coins || 0);
+  const rp = Math.floor(+local.rp || 0);
+  const kills = Math.floor(+local.kills || 0);
+  return { present: true, accepted: false, coins: Math.max(0, Math.min(1_000_000_000, coins)), rp: Math.max(0, Math.min(1_000_000_000, rp)), kills: Math.max(0, Math.min(1_000_000_000, kills)) };
 }
 
 // Keep only legendary (rarity 3) upgrade tracks. Mythic and other rarities are dropped, not granted.
@@ -65,17 +80,10 @@ export function createAccount(db, { token, name, local } = {}) {
   const existing = validToken(token) ? rowOf(db, token) : null;
   if (existing) return publicAccount(existing);
   const t = validToken(token) || crypto.randomBytes(18).toString('base64url');
-  let coins = 0, rp = 0, kills = 0, imported = 0, tmods = {};
   let nm = String(name || 'Игрок').replace(/[^\w \u0400-\u04FF.-]/g, '').trim().slice(0, 14) || 'Игрок';
-  if (local && typeof local === 'object') {
-    coins = Math.max(0, Math.min(5_000_000, Math.floor(+local.coins || 0)));
-    rp = Math.max(0, Math.min(5_000_000, Math.floor(+local.rp || 0)));
-    kills = Math.max(0, Math.min(5_000_000, Math.floor(+local.kills || 0)));
-    if (local.name) nm = String(local.name).replace(/[^\w \u0400-\u04FF.-]/g, '').trim().slice(0, 14) || nm;
-    tmods = legendaryTmods(local.tmods);
-    imported = 1;
-  }
-  db.prepare('INSERT INTO accounts (token, created, coins, rp, kills, matches, name, tmods, imported) VALUES (?, ?, ?, ?, ?, 0, ?, ?, ?)').run(t, Date.now(), coins, rp, kills, nm, JSON.stringify(tmods), imported);
+  if (local && local.name) nm = String(local.name).replace(/[^\w \u0400-\u04FF.-]/g, '').trim().slice(0, 14) || nm;
+  const note = deviceNote(local);
+  db.prepare('INSERT INTO accounts (token, created, coins, rp, kills, matches, name, tmods, imported, device_note) VALUES (?, ?, 0, 0, 0, 0, ?, ?, ?, ?)').run(t, Date.now(), nm, '{}', note.present ? 1 : 0, JSON.stringify(note));
   return publicAccount(rowOf(db, t));
 }
 

@@ -8,7 +8,7 @@
 <li><b>Флаг страны.</b> Определяется по языку и региону устройства (без GPS). В онлайне его видят другие игроки. Флаг можно сменить в настройках.</li>
 <li><b>Игровой прогресс</b>: уровень, монеты, кристаллы, предметы, покупки и настройки. Хранится <b>локально на вашем устройстве</b>.</li>
 <li><b>Онлайн-матчи.</b> На игровой сервер передаются ник, флаг, внешний вид танка и игровые действия на время матча.</li>
-<li><b>Счёт игрока.</b> Если клиент связался со сервером, на сервере в локальной базе хранятся токен устройства, ник, монеты, очки звания и легендарные улучшения. Это не платёжный счёт. Мифические покупки за деньги не записываются, потому что оплата не подключена. Копия на устройстве не удаляется.</li>
+<li><b>Счёт игрока.</b> Если клиент связался с сервером этой версии, в файле SQLite хранятся токен устройства и ник. Монеты, очки звания и легендарные улучшения на сервере начисляются только за матчи, которые провёл этот сервер. Числа из localStorage не становятся балансом сервера. Это не платёжный счёт. Оплата не подключена, мифические покупки не записываются. Копия на устройстве не удаляется. Файл SQLite на эфемерном диске хостинга пропадает при перезапуске, пока каталог базы не вынесен на постоянный диск и не включён ACCOUNT_DURABLE. Публичный хост эту базу ещё не обслуживает.</li>
 <li><b>Технические журналы.</b> Хостинг сервера (Render) может кратковременно хранить IP-адрес и время подключения для безопасности и диагностики.</li>
 <li><b>Игра рядом (Bluetooth / Wi-Fi).</b> Данные передаются напрямую между устройствами. Разрешения на устройства поблизости (на Android 12 и ниже — также местоположение) нужны системе только для поиска соседних устройств. Местоположение мы не определяем и не храним.</li></ul>
 <h2>2. Чего мы не делаем</h2>
@@ -20,7 +20,7 @@
 <h2>5. Дети</h2>
 <p>Игра не предназначена специально для детей младше 13 лет и сознательно не собирает их персональные данные.</p>
 <h2>6. Удаление данных</h2>
-<p>Чтобы удалить данные: «Настройки» → «Сбросить прогресс», или удалите приложение. На сервере после матча данные не хранятся. Вопросы и запросы на удаление отправляйте на e-mail, указанный выше.</p>
+<p>Чтобы удалить данные: «Настройки» → «Сбросить прогресс», или удалите приложение. Связанный серверный счёт, если он был создан на сервере этой версии, хранится в файле SQLite до удаления этого файла. Вопросы и запросы на удаление отправляйте на e-mail, указанный выше.</p>
 <h2>7. Изменения</h2><p>Новая версия политики публикуется по этому адресу с новой датой.</p></section>
 <hr>
 <section id="en"><h1>PRICOPBUM Privacy Policy</h1>
@@ -30,13 +30,13 @@
 <li><b>Country flag.</b> Derived from the device language and region, not GPS. Other players see it online. You can change it in settings.</li>
 <li><b>Game progress</b>: level, coins, gems, items, purchases and settings. Stored <b>locally on your device</b>.</li>
 <li><b>Online matches.</b> The game server receives your nickname, flag, tank appearance and in-game actions while a match runs.</li>
-<li><b>Player ledger.</b> After the client links, the server's local database stores a device token, nickname, coins, rank points and legendary upgrades. It is not a payment account. Mythic real-money items are not recorded, because checkout is not connected. The copy on the device is not deleted.</li>
+<li><b>Player ledger.</b> If the client links to a server running this version, a SQLite file stores the device token and nickname. Server coins, rank points and legendary upgrades are credited only for matches that server simulated. Numbers from localStorage do not become the server balance. It is not a payment account. Checkout is off, so mythic purchases are not recorded. The copy on the device is not deleted. On an ephemeral host disk that SQLite file disappears on restart unless the database directory is a persistent disk and ACCOUNT_DURABLE is set. The public host does not serve this ledger yet.</li>
 <li><b>Technical logs.</b> Our hosting provider (Render) may briefly keep IP addresses and connection times for security and diagnostics.</li>
 <li><b>Nearby play (Bluetooth / Wi-Fi).</b> Data goes directly between nearby devices. Nearby-device permissions (and, on Android 12 and lower, location) are required by the system only to discover nearby devices. We do not determine or store your location.</li></ul>
 <h2>2. What we don't do</h2><p>We do not sell personal data or share it with third parties for their own purposes. We do not collect your real name, e-mail, contacts, photos or precise location.</p>
 <h2>3. Purchases</h2><p>Real-money checkout is <b>not connected</b> in this version. Mythic-item and battle-pass buttons do not charge money and do not grant the item. Coins earned in battle stay on the device.</p>
 <h2>4. Ads</h2><p>An Android build may show Google AdMob ads if that module is included. This web build does not include it. The "Remove ads" purchase is unavailable.</p>
 <h2>5. Children</h2><p>The game is not directed at children under 13 and does not knowingly collect their personal data.</p>
-<h2>6. Deleting data</h2><p>To delete your data, use Settings → Reset progress or uninstall the app. The server keeps no data after a match. Send questions and deletion requests to the e-mail above.</p>
+<h2>6. Deleting data</h2><p>To delete your data, use Settings → Reset progress or uninstall the app. A linked server ledger, if one was created on a server running this version, stays in its SQLite file until that file is removed. Send questions and deletion requests to the e-mail above.</p>
 <h2>7. Changes</h2><p>Updates will be published at this address with a new date.</p></section>
 </body></html>

@@ -8,17 +8,10 @@
   window.__pbApplyAcct = function (meta, msg) {
     if (!meta || !meta.d || !msg || !msg.token) return;
     var d = meta.d;
-    if (meta._anchorCoins == null) meta._anchorCoins = d.coins | 0;
-    if (meta._anchorRp == null) meta._anchorRp = d.rp | 0;
-    var offlineCoins = (d.coins | 0) - meta._anchorCoins;
-    var offlineRp = (d.rp | 0) - meta._anchorRp;
-    d.coins = (msg.coins | 0) + offlineCoins;
-    d.rp = Math.max(0, (msg.rp | 0) + offlineRp);
+    // Device coins and rank stay on the device. The server balance is separate and starts at zero.
+    d.serverCoins = msg.coins | 0;
+    d.serverRp = msg.rp | 0;
     d.acct = msg.token;
-    d.tmod = d.tmod || {};
-    if (msg.tmods) { for (var id in msg.tmods) d.tmod[id] = msg.tmods[id]; }
-    meta._anchorCoins = d.coins;
-    meta._anchorRp = d.rp;
     saveToken(msg.token);
     try { meta.save(); } catch (e) {}
     try { if (window.__pbUi && window.__pbUi.refreshCurrency) window.__pbUi.refreshCurrency(); } catch (e) {}
@@ -43,21 +36,25 @@
   };
   function link() {
     var meta = window.__pbMeta;
+    var native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    console.log('[pb-boot] href=' + location.href + ' origin=' + location.origin + ' native=' + native);
     if (!meta || !meta.d) return;
-    var d = meta.d;
-    var existing = token();
-    var body = { token: existing || undefined, name: d.name || 'Игрок' };
-    if (!existing) body.local = { coins: d.coins | 0, rp: d.rp | 0, kills: d.stats && d.stats.kills | 0, name: d.name, tmods: d.tmod || {} };
-    fetch('/api/account', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
-      .then(function (r) { return r.json(); })
-      .then(function (acc) {
-        if (!acc || !acc.token) return;
-        if (meta._anchorCoins == null) { meta._anchorCoins = d.coins | 0; meta._anchorRp = d.rp | 0; }
-        d.acct = acc.token;
-        saveToken(acc.token);
-        window.__pbApplyAcct(meta, acc);
-      })
-      .catch(function () {});
+    fetch('/api/capabilities').then(function (r) { return r.ok ? r.json() : null; }).then(function (cap) {
+      console.log('[pb-boot] capabilities ' + (cap && cap.accounts === true ? 'accounts' : 'unavailable'));
+      if (!cap || cap.accounts !== true || cap.payments !== false) return;
+      var d = meta.d;
+      var existing = token();
+      var body = { token: existing || undefined, name: d.name || 'Игрок' };
+      var kept = d.coins | 0;
+      return fetch('/api/account', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json(); })
+        .then(function (acc) {
+          if (!acc || !acc.token || acc.coins == null) return;
+          window.__pbApplyAcct(meta, acc);
+          if ((meta.d.coins | 0) !== kept) meta.d.coins = kept;
+          try { meta.save(); } catch (e) {}
+        });
+    }).catch(function () {});
   }
   var tries = 0;
   var timer = setInterval(function () {
