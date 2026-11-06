@@ -32,7 +32,7 @@ test('the APK resolves API and websocket from one configured server, not the ass
   native.__pbSetServer('http://10.0.2.2:9090');
   assert.equal(native.__pbWsUrl(), 'ws://10.0.2.2:9090/ws');
   assert.equal(native.__pbApi('/api/account'), 'http://10.0.2.2:9090/api/account');
-  assert.match(js, /if\(window\.__pbWsUrl\)return window\.__pbWsUrl\(\)/);
+  assert.match(js, /window\.__pbWsUrl\)return window\.__pbWsUrl\(\)/);
   assert.match(html, /server-endpoint\.js/);
   assert.match(js, /tag:"150 ТАНКОВ"/);
   assert.match(js, /150 tanks on a huge map/);
@@ -49,5 +49,5 @@ test('account linking waits for a compatible welcome and does not copy device co
   assert.doesNotMatch(account, /fetch\('\/api\/capabilities'\)/);
   assert.doesNotMatch(account, /d\.coins = \(msg\.coins/);
   assert.match(account, /Этот сервер старее этой сборки/);
-  assert.match(account, /1\.1\.0/);
+  assert.match(account, /1\.2\.0/);
 });

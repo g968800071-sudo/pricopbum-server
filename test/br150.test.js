@@ -16,7 +16,7 @@ test('battle royale room options admit 150 and do not treat that as a human tria
   assert.equal(features.brAdmit, 150);
   assert.equal(features.brGoal, 150);
   assert.equal(features.brGoalVerified, false);
-  assert.equal(features.hostedTournament, false);
+  assert.equal(features.hostedTournament, true);
   assert.equal(features.payments, false);
   assert.equal(features.accounts, true);
 });

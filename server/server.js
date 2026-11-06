@@ -14,6 +14,7 @@ import { MAPS, decodeMap } from '../src/sim/maps.js';
 import { buildValid, MODELS } from '../src/sim/models.js';
 import { normLoadout } from '../src/sim/loadout.js';
 import { openStore, defaultDbFile, createAccount, getAccount, spendLegendary, creditMatch, validToken, tmodForModel } from '../src/account/store.js';
+import { createTourneyBook } from './tourney.js';
 
 const __dir = path.dirname(fileURLToPath(import.meta.url));
 const WWW = path.resolve(__dir, '../www');
@@ -88,7 +89,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods
 function sendJson(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS }); res.end(b); }
 function getAccountSafe(token) { return getAccount(accounts, token) || { ok: false }; }
 export function serverFeatures() {
-  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGoal: 150, brGoalVerified: false, hostedTournament: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.1.0' };
+  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGoal: 150, brGoalVerified: false, hostedTournament: true, tourSizes: [2, 4, 8], tourPracticeBots: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.2.0' };
 }
 function applyAccountTmod(c) {
   if (!c.hello) return;
@@ -120,11 +121,12 @@ const queues = Object.fromEntries(Object.keys(CAP).map(k => [k, []])); const que
 const rooms = new Map(); let nextRoom = 1;
 
 const send = (c, o) => {
-  if (c.ws.readyState !== 1) return;
+  if (!c || c.ws.readyState !== 1) return;
   // A slow client must not pin every snapshot. The next tick replaces a dropped one.
   if (o && o.t === 's' && c.ws.bufferedAmount > 262144) { c.dropped = (c.dropped | 0) + 1; return; }
   c.ws.send(JSON.stringify(o));
 };
+let tourney;
 function lobbyInfo() { for (const c of clients.values()) if (!c.room) send(c, { t: 'lobby', players: clients.size }); }
 
 wss.on('connection', (ws, req) => {
@@ -153,8 +155,12 @@ wss.on('connection', (ws, req) => {
       codes.delete(r.code); const mem = [...r.members.values()].slice(0, admitCount(r.cfg.variant)); for (const x of mem) { x.priv = null; x.ready = false; } startRoom(r.cfg.variant, mem, r.code, r.cfg); }
     else if (m.t === 'in') { if (c.room) c.room.host.setInput(c.id, m); }
     else if (m.t === 'leave') leaveRoom(c);
+    else if (m.t === 'tourJoin') tourney.join(c, m.size);
+    else if (m.t === 'tourReady') tourney.ready(c);
+    else if (m.t === 'tourLeave') tourney.leave(c);
+    else if (m.t === 'tourRejoin') { if (!tourney.rejoin(c, m.token)) send(c, { t: 'err', msg: 'Турнир уже закончился' }); }
   });
-  ws.on('close', () => { leaveQueue(c); leavePrivate(c); if (!armRejoin(c)) leaveRoom(c); clients.delete(c.id); lobbyInfo(); });
+  ws.on('close', () => { leaveQueue(c); leavePrivate(c); if (tourney) tourney.drop(c); if (!armRejoin(c)) leaveRoom(c); clients.delete(c.id); lobbyInfo(); });
 });
 function leaveQueue(c) { for (const k of Object.keys(queues)) { const i = queues[k].indexOf(c); if (i >= 0) queues[k].splice(i, 1); } }
 function leaveRoom(c) { if (!c.room) return; c.room.host.removePlayer(c.id); c.room.members.delete(c.id); c.room = null; }
@@ -202,6 +208,7 @@ function startRoom(variant, members, code, cfg) {
   const id = nextRoom++; const wire = new Map(members.map(c => [c.id, c]));
   const players = members.map(c => ({ ...c.hello, cid: c.id, team: c.team ?? undefined }));
   const { mode, opts } = roomOpts(variant, members.length, cfg); if (code) opts.code = code;
+  if (cfg && cfg.countdown != null) opts.countdown = cfg.countdown | 0;
   { const avg = (rar) => { const L = players.filter(p => p.tmod && MODELS[p.model] && MODELS[p.model].rar === rar && (rar < 4 || opts.payments)).map(p => p.tmod); return L.length ? L[0].map((_, i) => Math.round(L.reduce((a, b) => a + b[i], 0) / L.length)) : null; }; const lg = avg(3), my = avg(4); if (lg) opts.botMods = lg; if (my && opts.payments) opts.botMythMods = my; } // legendary coin mods only, unless real-money checkout is explicitly enabled
   if (variant === 'hunt' && members.length) { let lo = Infinity; for (const c of members) lo = Math.min(lo, c.huntN | 0); const P = members.filter(c => (c.huntN | 0) === lo), T = P[Math.floor(Math.random() * P.length)]; T.huntN = (T.huntN | 0) + 1; opts.huntTarget = T.id; for (const p of players) p.team = undefined; } // the target role rotates — whoever was target least often
   const room = { id, mode: variant, host: null, members: wire, wire, created: Date.now() };
@@ -211,6 +218,7 @@ function startRoom(variant, members, code, cfg) {
   rooms.set(id, room); host.startAll();
   for (const c of members) send(c, { t: 'rj', token: c.rejoinToken, ms: REJOIN_MS });
   console.log(`[room ${id}] ${variant}${code ? ' #' + code : ''} started with ${members.length} players`);
+  return room;
 }
 // fixed-step simulation for all rooms — started with the listener, so importing this module does not spin a loop
 let last = process.hrtime.bigint(), acc = 0; const STEP = 1 / 60; const stepStat = { avg: 0, max: 0, n: 0 };
@@ -229,6 +237,14 @@ function creditRoom(room) {
     if (acc) send(cl, { t: 'acct', ...acc });
   }
 }
+tourney = createTourneyBook({
+  send,
+  startMatch(members, code) {
+    if (rooms.size >= MAX_ROOMS) return null;
+    return startRoom('duel', members, code, { bots: false, time: 8, target: 1, countdown: 0 });
+  },
+  roomById: (id) => rooms.get(id),
+});
 export function startServer(port = PORT) {
   shuttingDown = false;
   if (!loopsOn) {
@@ -236,10 +252,10 @@ export function startServer(port = PORT) {
     every(10000, () => { stepStat.max = 0; });
     every(4, () => {
       const now = process.hrtime.bigint(); acc += Number(now - last) / 1e9; last = now; if (acc > 0.25) acc = 0.25;
-      while (acc >= STEP) { acc -= STEP; const t0 = process.hrtime.bigint(); for (const r of rooms.values()) { r.host.step(STEP); if (r.host.world.result && !r.credited) { r.credited = true; creditRoom(r); } if ((r.host.ended && r.host.endT > 15) || (r.members.size === 0 && !parkedHas(r))) { for (const c of r.members.values()) c.room = null; rooms.delete(r.id); console.log(`[room ${r.id}] closed`); } }
+      while (acc >= STEP) { acc -= STEP; const t0 = process.hrtime.bigint(); for (const r of rooms.values()) { r.host.step(STEP); if (r.host.world.result && !r.credited) { r.credited = true; creditRoom(r); if (tourney) tourney.onRoom(r); } if ((r.host.ended && r.host.endT > 15) || (r.members.size === 0 && !parkedHas(r))) { for (const c of r.members.values()) c.room = null; rooms.delete(r.id); console.log(`[room ${r.id}] closed`); } }
         const ms = Number(process.hrtime.bigint() - t0) / 1e6; stepStat.avg = stepStat.avg * 0.98 + ms * 0.02; stepStat.max = Math.max(stepStat.max, ms); }
     });
-    every(1000, queueTick);
+    every(1000, () => { queueTick(); if (tourney) tourney.sample(); });
   }
   if (server.listening) return Promise.resolve(server);
   return new Promise((resolve) => server.listen(port, '0.0.0.0', () => { console.log(`PRICOPBUM server on http://0.0.0.0:${server.address().port}  (ws path /ws)`); resolve(server); }));

@@ -4,7 +4,7 @@
   var KEY = 'pricopbum_server';
   var PROD_ORIGIN = 'https://pricopbum-server.onrender.com';
   var PROD_WS = 'wss://pricopbum-server.onrender.com/ws';
-  var BUILD = '1.1.0';
+  var BUILD = '1.2.0';
   function storeGet() { try { return (localStorage.getItem(KEY) || '').trim(); } catch (e) { return ''; } }
   function parse(raw) {
     if (!raw) return null;

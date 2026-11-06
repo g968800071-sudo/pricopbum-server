@@ -9,11 +9,11 @@ No signing secrets, keystores, or provisioning profiles are in this repository. 
 Built on this machine with the public Android command-line SDK (platform 35, build-tools 34/35) and JDK 21. Gradle signed it with the **debug** keystore that the Android Gradle plugin creates outside the repo (`~/.android/debug.keystore`). That file is not committed.
 
 - Project: `android/`
-- Package: `studio.pricop.pricopbum`, versionName `1.1.0`, versionCode `2`, minSdk 22, targetSdk 35
-- This is a later test than the limited Android APK `1.0` / versionCode 1 (SHA256 `4572a4edddad394a032f3d6731df5d403d09c955c050bda5a28be0f251221764`). The screen shows `PRICOPBUM 1.1.0 test`.
-- Gradle output: `android/app/build/outputs/apk/debug/app-debug.apk` (8.6 MB)
-- SHA256: `9efecc88c152cadcb33ef1075f6cc63b0f7e881af2b12687ffd2efe324eee0fb`
-- Copy: `/opt/cursor/artifacts/pricopbum-1.1.0-debug.apk`
+- Package: `studio.pricop.pricopbum`, versionName `1.2.0`, versionCode `3`, minSdk 22, targetSdk 35
+- This is a later test than `1.1.0` (SHA256 `9efecc88c152cadcb33ef1075f6cc63b0f7e881af2b12687ffd2efe324eee0fb`) and the limited `1.0` APK (SHA256 `4572a4edddad394a032f3d6731df5d403d09c955c050bda5a28be0f251221764`). The screen shows `PRICOPBUM 1.2.0 test`.
+- Gradle output: `android/app/build/outputs/apk/debug/app-debug.apk`
+- SHA256: `359ed2e8944b3d86783e66887ffa3b6d68460783a4fe47001758adefac47ce66`
+- Copy: `/opt/cursor/artifacts/pricopbum-1.2.0-debug.apk`
 
 Rebuild:
 
@@ -36,7 +36,7 @@ The device wallet stayed at 20 coins. The ledger row was coins 0, rank 0, no mod
 
 ## iOS
 
-`ios/` is the Capacitor/Xcode project. CocoaPods is not installed in this Linux environment, and Xcode is not available, so **no iPhone executable and no IPA was produced**.
+`ios/` is the Capacitor/Xcode project. This Linux machine has no Xcode, so it cannot compile the shell. `.github/workflows/ios-simulator.yml` uses the standard free `macos-latest` runner on this public repository to install CocoaPods and build an unsigned iOS Simulator `.app`. That file is not a signed iPhone app and cannot be installed on a phone.
 
 On a Mac, later:
 

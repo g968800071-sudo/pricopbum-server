@@ -199,7 +199,7 @@ export class World {
   botLv(maxL) { maxL = this.diff.lv; const r = this.rng; return { dmg: r.int(0, maxL), reload: r.int(0, maxL), armor: r.int(0, maxL), engine: r.int(0, maxL) }; }
   initBR() {
     const o = this.opts; this.map = genBR(this.seed, o.mapSize || 340); const m = this.map; if (o.terrain && !o.ffa && !o.cbuild) addTerrain(m, this.seed); // r37: hills & craters only in the big BR
-    const total = o.total || 100, humans = o.players || [];
+    const total = o.total || 150, humans = o.players || [];
     this.zone = { cx: m.pw / 2, cy: m.ph / 2, r: Math.hypot(m.pw, m.ph) / 2 + 40, tcx: m.pw / 2, tcy: m.ph / 2, tr: 0, phase: -1, timer: 0, state: 'wait', dps: 0, sr: 0, scx: 0, scy: 0 };
     this.ffa = !!o.ffa; if (this.ffa) { this.target = o.target || 25; this.timeLimit = o.timeLimit || 300; }
     this.zonePhases = this.ffa ? [] : o.zonePhases || [

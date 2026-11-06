@@ -93,12 +93,13 @@ export const ONLINE_URL = 'wss://pricopbum-server.onrender.com/ws';
 export class NetClient {
   constructor(app) { this.app = app; this.status = 'offline'; this.tr = null; this.players = 0; }
   defaultUrl() {
-    try { const l = window.location; if (l && /^https?:$/.test(l.protocol) && l.hostname && (/onrender\.com$/.test(l.hostname) || (/^(localhost|127\.0\.0\.1)$/.test(l.hostname) && l.port))) return (l.protocol === 'https:' ? 'wss://' : 'ws://') + l.host + '/ws'; } catch (e) {}
+    try { if (typeof window !== 'undefined' && window.__pbWsUrl) return window.__pbWsUrl(); } catch (e) {}
+    try { const l = window.location; const native = typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform(); if (!native && l && /^https?:$/.test(l.protocol) && l.hostname && (/onrender\.com$/.test(l.hostname) || (/^(localhost|127\.0\.0\.1)$/.test(l.hostname) && l.port))) return (l.protocol === 'https:' ? 'wss://' : 'ws://') + l.host + '/ws'; } catch (e) {}
     return ONLINE_URL;
   }
   set(st) { this.status = st; this.app.ui.setNetStatus(); }
   connect(url, attempt = 0) {
-    url = url || this.defaultUrl(); if (/pages\.grok\.bot|cursor\.com/.test(url)) url = ONLINE_URL; if (/localhost:8080/.test(url) && !/^(localhost|127\.)/.test((typeof location !== 'undefined' && location.hostname) || '')) url = ONLINE_URL; if (!/^wss?:\/\//.test(url)) url = 'ws://' + url;
+    url = url || this.defaultUrl(); if (/pages\.grok\.bot|cursor\.com/.test(url)) url = ONLINE_URL; if (/localhost:8080/.test(url) && !/^(localhost|127\.)/.test((typeof location !== 'undefined' && location.hostname) || '')) url = ONLINE_URL; if (!/^wss?:\/\//.test(url)) url = 'ws://' + url; try { if (typeof window !== 'undefined' && window.__pbSetServer) window.__pbSetServer(url); } catch (e) {}
     if (attempt === 0) this.wakeT0 = Date.now(); clearTimeout(this.retryT);
     this.app.meta.d.server = url; this.app.meta.save(); this.disconnect(); this.set('connecting');
     let tr; try { tr = new WsTransport(url); } catch (e) { this.set('error'); this.app.ui.toast('Неверный адрес сервера', 'info'); return; }
@@ -107,7 +108,7 @@ export class NetClient {
     const to = setTimeout(() => { if (this.status === 'connecting') { if (canRetry()) return retry(); this.set('error'); this.app.ui.toast('Сервер не отвечает', 'info'); tr.close(); } }, 12000);
     tr.onOpen(() => { const p = this.app.playerCfg(); tr.send({ t: 'hello', v: PROTO, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, tlv: p.tlv, model: p.model, tmod: p.tmod, build: p.build, loadout: p.loadout, cc: p.cc }); });
     tr.onMessage((m) => {
-      if (m.t === 'welcome') { clearTimeout(to); this.players = m.players; this.set('online'); if (this._rjPending) { const tk = this._rjPending; this._rjPending = null; tr.send({ t: 'rejoin', token: tk }); return; } this.app.ui.toast('Подключено к серверу', 'globe'); }
+      if (m.t === 'welcome') { clearTimeout(to); this.players = m.players; try { if (typeof window !== 'undefined') { window.__pbServerFeatures = m.features || null; window.__pbLegacyServer = !m.features; if (window.__pbOnWelcome) window.__pbOnWelcome(m); } } catch (e) {} this.set('online'); if (this._rjPending) { const tk = this._rjPending; this._rjPending = null; tr.send({ t: 'rejoin', token: tk }); return; } const tourTok = this._tourToken; if (tourTok) { this._tourToken = null; tr.send({ t: 'tourRejoin', token: tourTok }); } this.app.ui.toast('Подключено к серверу', 'globe'); }
       else if (m.t === 'lobby') { this.players = m.players; if (this.status === 'online') this.app.ui.setNetStatus(); }
       else if (m.t === 'queue') { this.status = 'queue'; this.showQueue(m); }
       else if (m.t === 'rj') this.rejoinToken = m.token;
@@ -115,6 +116,7 @@ export class NetClient {
       else if (m.t === 'room') { this.room = m; this.app.ui.roomLobby(m); }
       else if (m.t === 'roomGone') { this.room = null; this.app.ui.closeRoom(); if (m.msg) this.app.ui.toast(m.msg, 'info'); }
       else if (m.t === 'roomChat') { this.app.ui.roomChatMsg(m); }
+      else if (m.t === 'tour') { if (m.token) this.tourToken = m.token; if (this.app.ui.tourNet) this.app.ui.tourNet(m); }
       else if (m.t === 'err') { this.app.ui.toast(m.msg || 'Ошибка сервера', 'info'); if (m.rejoin === false && this.app.state === 'game') this.app.quitToMenu(); }
     });
     tr.onClose(() => { clearTimeout(to); if (tr.dead) return; if (this.status === 'connecting' && canRetry()) return retry(); const was = this.status; this.tr = null; this.closeQueue();
@@ -122,7 +124,8 @@ export class NetClient {
       if (inGame && this.rejoinToken && (this._rj = (this._rj || 0) + 1) <= 3) { tr.dead = true; this._rjPending = this.rejoinToken; this.set('connecting'); this.app.ui.toast('Связь пропала, возвращаемся в бой…', 'info'); this.retryT = setTimeout(() => { if (this._rjPending) this.connect(url, 0); }, 600); return; }
       this.set(was === 'connecting' ? 'error' : 'offline'); if (inGame) { this.app.ui.toast('Соединение потеряно', 'info'); this.app.quitToMenu(); } });
   }
-  disconnect() { if (this.tr) { const t = this.tr; this.tr = null; t.close(); } this.status = 'offline'; }
+  disconnect() { if (this.tr) { const t = this.tr; this.tr = null; t.close(); } this.status = 'offline'; try { if (typeof window !== 'undefined' && window.__pbOnOffline) window.__pbOnOffline(); } catch (e) {} }
+  tourRejoinToken() { return this.tourToken || null; }
   quickMatch(mode) { if (!this.tr) return this.app.ui.toast('Сначала подключитесь к серверу', 'info'); const p = this.app.playerCfg(); this.tr.send({ t: 'qm', mode, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, tmod: p.tmod, build: p.build, loadout: p.loadout }); }
   createRoom(variant) { if (!this.tr) return this.app.ui.toast('Сначала подключитесь к серверу', 'info'); const p = this.app.playerCfg(); this.tr.send({ t: 'create', variant, name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, tmod: p.tmod, build: p.build, loadout: p.loadout }); }
   joinRoom(code) { if (!this.tr) return this.app.ui.toast('Сначала подключитесь к серверу', 'info'); const p = this.app.playerCfg(); this.tr.send({ t: 'join', code: String(code || '').toUpperCase().trim(), name: p.name, skin: p.skin, weapon: p.weapon, lv: p.lv, model: p.model, tmod: p.tmod, build: p.build, loadout: p.loadout }); }
