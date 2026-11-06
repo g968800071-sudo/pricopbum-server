@@ -20,12 +20,12 @@ void pbInjectTwoSticks(CGPoint moveDown, CGPoint moveTo, CGPoint aimDown, CGPoin
     SEL liftSel = NSSelectorFromString(@"liftUpAtOffset:");
     if (![move respondsToSelector:moveSel] || ![move respondsToSelector:liftSel]) { done(@"no-move-or-lift"); return; }
     NSTimeInterval up = 0.35 + (hold > 0.2 ? hold : 0.2);
-    void (*moveTo)(id, SEL, CGPoint, NSTimeInterval) = (void (*)(id, SEL, CGPoint, NSTimeInterval))objc_msgSend;
-    void (*lift)(id, SEL, NSTimeInterval) = (void (*)(id, SEL, NSTimeInterval))objc_msgSend;
-    moveTo(move, moveSel, moveTo, 0.35);
-    moveTo(aim, moveSel, aimTo, 0.35);
-    lift(move, liftSel, up);
-    lift(aim, liftSel, up);
+    void (*moveFn)(id, SEL, CGPoint, NSTimeInterval) = (void (*)(id, SEL, CGPoint, NSTimeInterval))objc_msgSend;
+    void (*liftFn)(id, SEL, NSTimeInterval) = (void (*)(id, SEL, NSTimeInterval))objc_msgSend;
+    moveFn(move, moveSel, moveTo, 0.35);
+    moveFn(aim, moveSel, aimTo, 0.35);
+    liftFn(move, liftSel, up);
+    liftFn(aim, liftSel, up);
     id record = nil;
     SEL named = NSSelectorFromString(@"initWithName:interfaceOrientation:");
     if ([recCls instancesRespondToSelector:named]) {
