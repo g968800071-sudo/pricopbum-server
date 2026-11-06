@@ -16,13 +16,16 @@ export function rankOf(profile) {
   return { i, name: RANK_NAMES[i], sub: 1 + Math.floor(o * 3), pct: Math.floor(o * 100), next: i + 2 >= RANK_NAMES.length ? '???' : RANK_NAMES[i + 1] };
 }
 
-// Match result → rank-point delta. A win is positive, a loss is negative. Never used for real-money rewards.
+// Match result → rank-point delta. A win is +25, a loss is −15, a draw is neither.
+// Kills still add points. Never used for real-money rewards.
 export function rankDelta(res) {
   const kills = res.kills || 0;
-  let win = !!res.win;
-  if (res.mode === 'br' && res.place && res.total) win = res.place <= Math.max(1, Math.ceil(res.total * 0.1));
+  const draw = res.draw === true || res.winnerTeam === -1;
+  let win = !!res.win && !draw;
+  if (!draw && res.mode === 'br' && res.place && res.total) win = res.place <= Math.max(1, Math.ceil(res.total * 0.1));
   const podium = res.mode === 'br' && res.place && res.place <= 3;
-  return (win ? 25 : -15) + Math.min(20, kills * 2) + (podium ? 10 : 0);
+  const base = draw ? 0 : (win ? 25 : -15);
+  return base + Math.min(20, kills * 2) + (podium ? 10 : 0);
 }
 
 export function applyRank(profile, res) {

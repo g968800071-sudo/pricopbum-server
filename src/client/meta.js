@@ -9,12 +9,12 @@ export function rankInfo(d) { const rp = Math.max(0, (d && d.rp) || 0), k = (d &
   const fp = (rp - RK_P[i]) / (RK_P[i + 1] - RK_P[i]), fk = RK_K[i + 1] > RK_K[i] ? (k - RK_K[i]) / (RK_K[i + 1] - RK_K[i]) : 1, f = Math.max(0, Math.min(0.999, Math.min(fp, fk)));
   return { i, name: RANKS[i], sub: 1 + Math.floor(f * 3), pct: Math.floor(f * 100), next: i + 2 >= RANKS.length ? '???' : RANKS[i + 1] }; }
 export const rankOf = (x) => typeof x === 'object' && x ? rankInfo(x).name : RANKS[Math.min(RANKS.length - 1, Math.floor(((x || 1) - 1) / 3))];
-export function rpDelta(r) { const kills = r.kills || 0; let win = !!r.win; if (r.mode === 'br' && r.place && r.total) win = r.place <= Math.max(1, Math.ceil(r.total * 0.1)); const top = r.mode === 'br' && r.place && r.place <= 3;
-  return (win ? 25 : -15) + Math.min(20, kills * 2) + (top ? 10 : 0); }
+import { rankDelta } from '../sim/rank.js';
+export function rpDelta(r) { return rankDelta(r); }
 // r27: persistent bot ladder — every bot nickname keeps its own rank points + career kills, updated with rpDelta exactly like the player
 export function botMatch(d, view, mode) { if (!view || !view.tanks || mode === 'classic') return; const B = d.botRp || (d.botRp = {}); const tot = view.tanks.length; const top = Math.max(...view.tanks.map(t => t.kills || 0));
   for (const t of view.tanks) { if (!t.name || t.human || !t.ai && t.cid) continue; const e = B[t.name] || (B[t.name] = { rp: RK_P[Math.max(0, Math.min(RANKS.length - 2, (t.prk | 0) - 1))] || 0, k: RK_K[Math.max(0, Math.min(RANKS.length - 2, (t.prk | 0) - 1))] || 0 });
-    const win = mode === 'br' ? false : view.winTeam != null ? t.team === view.winTeam : (t.kills || 0) === top && top > 0; e.rp = Math.max(0, e.rp + rpDelta({ mode, kills: t.kills || 0, win, place: t.place, total: tot })); e.k += t.kills || 0; }
+    const draw = !!(view.result && view.result.winnerTeam === -1); const win = draw ? false : mode === 'br' ? false : view.winTeam != null ? t.team === view.winTeam : (t.kills || 0) === top && top > 0; e.rp = Math.max(0, e.rp + rpDelta({ mode, kills: t.kills || 0, win, draw, place: t.place, total: tot })); e.k += t.kills || 0; }
   const ks = Object.keys(B); if (ks.length > 400) for (const k of ks.slice(0, ks.length - 400)) delete B[k]; }
 export function botRanks(d) { const B = d.botRp || {}, o = {}; for (const n in B) o[n] = rankInfo({ rp: B[n].rp, stats: { kills: B[n].k } }).i; return o; }
 export const TANK_LV_MAX = 20;
@@ -152,6 +152,6 @@ export class Meta {
     const deviceCoins = this.d.coins | 0;
     botEcoEarn(this.d, coins); this.addCoins(coins); const ups = this.addXp(xp, !r.online); const ach = this.checkAch();
     if (r.online && (this.d.coins | 0) !== deviceCoins) this.d.coins = deviceCoins;
-    const RI1 = rankInfo(this.d); return { coins, serverCoins, deviceCoins: this.d.coins | 0, online: !!r.online, xp, ups, ach, missionsDone, tl0, tl1, rk0, rk1: RI1.name, rpD: r.online ? rpD : rpD, crLost, crKept, promo: !r.online && RI1.i > RI0.i, demo: !r.online && RI1.i < RI0.i, rpct: RI1.pct, rnext: RI1.next, ri: RI1.i };
+    const RI1 = rankInfo(this.d); return { coins, serverCoins, deviceCoins: this.d.coins | 0, online: !!r.online, draw: !!r.draw, xp, ups, ach, missionsDone, tl0, tl1, rk0, rk1: RI1.name, rpD, crLost, crKept, promo: !r.online && RI1.i > RI0.i, demo: !r.online && RI1.i < RI0.i, rpct: RI1.pct, rnext: RI1.next, ri: RI1.i };
   }
 }

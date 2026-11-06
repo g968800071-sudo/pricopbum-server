@@ -145,6 +145,9 @@ test('legendary coin mods apply; mythic real-money mods do not while payments ar
 test('rank points rise on a win, fall on a loss, and do not go below zero', () => {
   assert.ok(rankDelta({ win: true, kills: 2, mode: 'team' }) > 0);
   assert.ok(rankDelta({ win: false, kills: 0, mode: 'team' }) < 0);
+  assert.equal(rankDelta({ win: false, draw: true, kills: 0, mode: 'team' }), 0);
+  assert.equal(rankDelta({ win: false, winnerTeam: -1, kills: 0, mode: 'team' }), 0);
+  assert.equal(rankDelta({ win: true, draw: true, kills: 0, mode: 'team' }), 0);
   const profile = { rp: 0, stats: { kills: 0 } };
   applyRank(profile, { win: true, kills: 3, mode: 'team' });
   const won = profile.rp;

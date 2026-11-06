@@ -10,7 +10,7 @@
     if (el) return el;
     el = document.createElement('div');
     el.id = 'pb-build';
-    el.textContent = 'PRICOPBUM ' + (window.__pbBuild || '1.2.3') + ' test';
+    el.textContent = 'PRICOPBUM ' + (window.__pbBuild || '1.2.4') + ' test';
     el.style.cssText = 'position:fixed;left:8px;bottom:6px;z-index:40;font:600 11px system-ui,sans-serif;color:#ffd23d;pointer-events:none;text-shadow:0 1px 2px #000';
     document.body.appendChild(el);
     return el;
@@ -61,16 +61,24 @@
     });
   };
   function applyLedger(meta, acc, how) {
+    var prev = meta.d.serverCoins | 0;
     var kept = meta.d.coins | 0;
     window.__pbApplyAcct(meta, acc);
     if ((meta.d.coins | 0) !== kept) meta.d.coins = kept;
     try { meta.save(); } catch (e) {}
-    banner('Серверный счёт ' + (acc.coins | 0) + '. На устройстве ' + kept + '. Монеты устройства не зачислены.');
+    var total = acc.coins | 0;
+    var delta = total - prev;
     var reward = document.getElementById('pb-server-reward');
-    if (reward) reward.textContent = String(acc.coins | 0);
+    var totalEl = document.getElementById('pb-server-total');
+    if (how === 'match' && reward) reward.textContent = String(delta);
+    if (totalEl) totalEl.textContent = how === 'match' ? (' · счёт ' + total) : '';
     var wallet = document.getElementById('pb-device-wallet');
     if (wallet) wallet.textContent = ' · устройство ' + kept + ' не зачислено';
-    console.log('[pb-acct] ' + how + ' serverCoins=' + (acc.coins | 0) + ' deviceCoins=' + kept + ' auth=' + !!meta.d.onlineAuth + ' credited=false');
+    var line = 'Серверный счёт ' + total;
+    if (how === 'match') line += ' · этот бой +' + delta;
+    line += '. На устройстве ' + kept + '. Монеты устройства не зачислены.';
+    banner(line);
+    console.log('[pb-acct] ' + how + ' serverCoins=' + total + ' delta=' + delta + ' deviceCoins=' + kept + ' auth=' + !!meta.d.onlineAuth + ' credited=false');
     try {
       var net = window.__pbApp && window.__pbApp.net;
       if (net && net.tr && acc.token) net.tr.send({ t: 'bindAcct', token: acc.token });
@@ -136,12 +144,7 @@
   window.__pbOnAcct = function (msg) {
     var meta = window.__pbMeta;
     if (!meta || !meta.d || !msg || msg.coins == null || !msg.token) return;
-    var kept = meta.d.coins | 0;
-    window.__pbApplyAcct(meta, msg);
-    if ((meta.d.coins | 0) !== kept) meta.d.coins = kept;
-    try { meta.save(); } catch (e) {}
-    banner('Серверный счёт ' + (msg.coins | 0) + '. На устройстве ' + kept + '. Монеты устройства не зачислены.');
-    console.log('[pb-acct] match serverCoins=' + (msg.coins | 0) + ' deviceCoins=' + kept + ' credited=false');
+    applyLedger(meta, msg, 'match');
   };
   window.__pbOnWelcome = function (msg) {
     var meta = window.__pbMeta;

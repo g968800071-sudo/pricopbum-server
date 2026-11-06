@@ -66,8 +66,9 @@ test('online match credit uses the server formula and does not pay twice', () =>
 test('a match credit, relaunch and legendary spend do not double-award', () => {
   const a = createAccount(db, { local: { coins: 20, rp: 40, kills: 9 } });
   assert.equal(a.coins, 0);
-  const summary = { mode: 'team', win: false, kills: 0, place: 0, total: 2 };
+  const summary = { mode: 'team', win: false, draw: true, kills: 0, place: 0, total: 2 };
   const first = creditMatch(db, a.token, 'room-draw', summary);
+  assert.equal(first.rp, 0);
   const replay = creditMatch(db, a.token, 'room-draw', summary);
   assert.equal(first.coins, matchCoins(summary));
   assert.equal(first.coins, 3);

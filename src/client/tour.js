@@ -42,9 +42,12 @@ export function installTour(UI) { const P = UI.prototype;
     const cols = rounds.map((R, ri) => h('div', { class: 'tcol' }, h('small', null, R.length === 1 ? 'Чемпион' : '1/' + (R.length / 2)), R.map(p => h('div', { class: 'tourp' + (p.id === msg.you ? ' me' : '') }, (p.flag || '') + ' ' + p.name))));
     const mine = live.find(m => m.a.id === msg.you || m.b.id === msg.you);
     const other = live.find(m => m !== mine);
-    const boardLine = other ? ('Камера другого боя, управление не отправляется: ' + other.a.name + ' ' + (other.killsA | 0) + ' — ' + (other.killsB | 0) + ' ' + other.b.name) : '';
-    tourBoard(msg.phase === 'live' ? boardLine : '');
-    try { window.__pbTour = { phase: msg.phase, size: msg.size, practice: false, humansOnly: true, members: members.map(p => p.name), board: boardLine }; } catch (e) {}
+    const boardLine = other ? ('Другой бой: ' + other.a.name + ' ' + (other.killsA | 0) + ' — ' + (other.killsB | 0) + ' ' + other.b.name + '. Нажмите, чтобы открыть камеру') : '';
+    const watching = !!(ui.app.net && ui.app.net.watching);
+    const inGame = ui.app.state === 'game';
+    try { window.__pbTour = { phase: msg.phase, size: msg.size, practice: false, humansOnly: true, members: members.map(p => p.name), board: watching ? '' : boardLine }; } catch (e) {}
+    tourBoard(!watching && msg.phase === 'live' ? boardLine : '');
+    if (inGame) return;
     const btn = [];
     btn.push(h('p', { class: 'note' }, 'Живые игроки на этом сервере. Ботов в сетке нет.'));
     if (msg.phase === 'lobby') {

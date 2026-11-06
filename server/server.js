@@ -89,7 +89,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods
 function sendJson(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS }); res.end(b); }
 function getAccountSafe(token) { return getAccount(accounts, token) || { ok: false }; }
 export function serverFeatures() {
-  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGiantAdmit: admitCount('brg'), brGoal: 150, brGoalVerified: false, hostedTournament: true, tourWatch: true, tourSizes: [2, 4, 8], tourPracticeBots: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.2.3' };
+  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGiantAdmit: admitCount('brg'), brGoal: 150, brGoalVerified: false, hostedTournament: true, tourWatch: true, tourSizes: [2, 4, 8], tourPracticeBots: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.2.4' };
 }
 function applyAccountTmod(c) {
   if (!c.hello) return;
@@ -278,8 +278,9 @@ function creditRoom(room) {
     if (!cl.accountToken) continue;
     const hs = room.host.clients.get(cl.id), tank = hs && hs.tank;
     if (!tank) continue;
-    const win = w.mode === 'team' ? res.winnerTeam === tank.team : w.mode === 'br' ? (res.winner === tank.id || tank.place === 1) : !!res.win;
-    const summary = { mode: w.mode, variant: w.opts.variant || w.special || null, kills: tank.kills | 0, place: tank.place || 0, total: w.tanks.length, win, rew: w.diff ? w.diff.rew : 1, online: true };
+    const draw = w.mode === 'team' && res.winnerTeam === -1;
+    const win = draw ? false : w.mode === 'team' ? res.winnerTeam === tank.team : w.mode === 'br' ? (res.winner === tank.id || tank.place === 1) : !!res.win;
+    const summary = { mode: w.mode, variant: w.opts.variant || w.special || null, kills: tank.kills | 0, place: tank.place || 0, total: w.tanks.length, win, draw, winnerTeam: res.winnerTeam, rew: w.diff ? w.diff.rew : 1, online: true };
     const acc = creditMatch(accounts, cl.accountToken, 'room-' + room.id, summary);
     if (acc) send(cl, { t: 'acct', ...acc });
   }

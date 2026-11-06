@@ -9,11 +9,11 @@ No signing secrets, keystores, or provisioning profiles are in this repository. 
 Built on this machine with the public Android command-line SDK (platform 35, build-tools 34/35) and JDK 21. Gradle signed it with the **debug** keystore that the Android Gradle plugin creates outside the repo (`~/.android/debug.keystore`). That file is not committed.
 
 - Project: `android/`
-- Package: `studio.pricop.pricopbum`, versionName `1.2.3`, versionCode `6`, minSdk 22, targetSdk 35
+- Package: `studio.pricop.pricopbum`, versionName `1.2.4`, versionCode `7`, minSdk 22, targetSdk 35
 - This is a later test than `1.2.1` (SHA256 `1ca0194e7cbfe82f4a19571f4241d54bbacc0a4a36a86340af7b47197645416d`), `1.2.0`, `1.1.0`, and the limited `1.0` APK. The screen shows `PRICOPBUM 1.2.2 test`.
 - Gradle output: `android/app/build/outputs/apk/debug/app-debug.apk`
 - SHA256: `c0f02fbe83db6c93124bf2b660f7e4fe82e7c641eed6776f13b42a8101546763`
-- Copy: `/cursor/stores/self/artifacts/pricopbum-1.2.3-debug.apk`
+- Copy: `/cursor/stores/self/artifacts/pricopbum-1.2.4-debug.apk`
 
 Rebuild:
 
