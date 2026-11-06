@@ -10,7 +10,7 @@
     if (el) return el;
     el = document.createElement('div');
     el.id = 'pb-build';
-    el.textContent = 'PRICOPBUM ' + (window.__pbBuild || '1.2.4') + ' test';
+    el.textContent = 'PRICOPBUM ' + (window.__pbBuild || '1.2.5') + ' test';
     el.style.cssText = 'position:fixed;left:8px;bottom:6px;z-index:40;font:600 11px system-ui,sans-serif;color:#ffd23d;pointer-events:none;text-shadow:0 1px 2px #000';
     document.body.appendChild(el);
     return el;
@@ -21,8 +21,9 @@
     if (!el) {
       el = document.createElement('div');
       el.id = 'pb-compat';
-      el.style.cssText = 'position:fixed;left:12px;right:12px;top:8px;z-index:45;padding:8px 12px;border-radius:12px;background:rgba(20,12,8,.92);color:#ffe1c2;border:1px solid #e0a15a;font:600 13px/1.35 system-ui,sans-serif;pointer-events:none';
-      document.body.appendChild(el);
+      el.style.cssText = 'position:absolute;left:12px;right:12px;top:8px;z-index:40;padding:8px 12px;border-radius:12px;background:rgba(20,12,8,.92);color:#ffe1c2;border:1px solid #e0a15a;font:600 13px/1.35 system-ui,sans-serif;pointer-events:none';
+      var host = document.querySelector('.pcb') || document.body;
+      host.appendChild(el);
     }
     el.textContent = text;
   }

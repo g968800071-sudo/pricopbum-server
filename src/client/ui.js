@@ -75,7 +75,7 @@ export class UI {
   fade(fn) { this.fadeEl.classList.add('on'); setTimeout(() => { fn(); setTimeout(() => this.fadeEl.classList.remove('on'), 30); }, 260); }
   toast(text, ic = 'star') { const t = h('div', { class: 'toast' }, icon(ic, 18), h('span', null, text)); this.toastsEl.appendChild(t); setTimeout(() => t.remove(), 3100); }
   modal(kids, onAct, opts = {}) {
-    const ov = h('div', { class: 'ov' }, h('div', { class: 'modal' }, kids)); this.root.appendChild(ov);
+    const ov = h('div', { class: 'ov' }, h('div', { class: 'modal' }, kids)); this.root.appendChild(ov); const banner = document.getElementById('pb-compat'); if (banner) ov.style.top = Math.ceil(banner.getBoundingClientRect().bottom + 4) + 'px';
     requestAnimationFrame(() => ov.classList.add('on'));
     const close = () => { ov.classList.remove('on'); setTimeout(() => ov.remove(), 220); };
     ov.addEventListener('click', (e) => { const b = e.target.closest('[data-m]'); if (b) { this.app.audio.play('click'); const r = onAct ? onAct(b.dataset.m, b, close) : undefined; if (r !== false) close(); } else if (e.target === ov && opts.dismiss !== false) close(); });

@@ -1,5 +1,6 @@
 # Unsigned iOS Simulator build on a standard GitHub-hosted macOS runner.
-# Public repositories: standard runners, including macos-latest, are free.
+# Public repositories: macos-26-intel is a free standard Intel runner (4 CPU, 14 GB).
+# macos-latest is arm64 and was cancelled while queued for capacity.
 # https://docs.github.com/en/actions/reference/runners/github-hosted-runners
 # This does not sign, archive for a device, or submit to the App Store or TestFlight.
 name: iOS simulator unsigned
@@ -12,7 +13,7 @@ on:
 
 jobs:
   simulator:
-    runs-on: macos-latest
+    runs-on: macos-26-intel
     steps:
       - uses: actions/checkout@v4
 
