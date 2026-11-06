@@ -96,7 +96,7 @@ jobs:
           rm -f /tmp/pb-ios-probe.sqlite /tmp/pb-probe.jsonl
           PB_PROBE=1 PB_PROBE_LOG=/tmp/pb-probe.jsonl PORT=8799 ACCOUNT_DB=/tmp/pb-ios-probe.sqlite QUEUE_SECONDS=120 node server/server.js > "$GITHUB_WORKSPACE/ios-report/server.log" 2>&1 &
           echo $! > /tmp/pb-ios-server.pid
-          trap 'cp /tmp/pb-probe.jsonl "$GITHUB_WORKSPACE/ios-report/probe.jsonl" 2>/dev/null || true' EXIT
+          trap 'cp /tmp/pb-probe.jsonl "$GITHUB_WORKSPACE/ios-report/probe.jsonl" 2>/dev/null || true; mkdir -p "$GITHUB_WORKSPACE/ios-report/shots"; cp /tmp/pb-shop.png /tmp/pb-during-touch.png /tmp/pb-inject.txt "$GITHUB_WORKSPACE/ios-report/shots/" 2>/dev/null || true' EXIT
           for i in 1 2 3 4 5 6 7 8 9 10; do curl -sf http://127.0.0.1:8799/health >/dev/null && break; sleep 1; done
           curl -sf http://127.0.0.1:8799/health >/dev/null || { echo 'throwaway server did not start'; cat "$GITHUB_WORKSPACE/ios-report/server.log" || true; exit 1; }
           mkdir -p "$GITHUB_WORKSPACE/ios-report/shots"
@@ -140,6 +140,10 @@ jobs:
               raise SystemExit('no shot from the aim stick: ' + last)
           if '"coins":0' in last:
               raise SystemExit('no trusted touchstart: ' + last)
+          if 'both=1' not in last:
+              raise SystemExit('move and fire were not held together: ' + last)
+          if 'play=1' not in last:
+              raise SystemExit('touches were not applied during play: ' + last)
           print('touch-ok', last)
           PY
           xcrun simctl io "$UDID" screenshot "$GITHUB_WORKSPACE/ios-report/shots/before-relaunch.png" || true

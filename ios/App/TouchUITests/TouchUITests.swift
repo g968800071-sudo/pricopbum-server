@@ -7,22 +7,32 @@ final class TouchUITests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         app.launch()
         XCUIDevice.shared.orientation = .landscapeLeft
-        XCTAssertGreaterThan(app.frame.width, app.frame.height)
+        XCTAssertGreaterThan(app.frame.width, app.frame.height, "expected a landscape app frame, got \(app.frame)")
         XCTAssertTrue(waitLog("\"stage\":\"menu\"", 45))
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.16)).tap()
-        XCTAssertTrue(waitLog("\"stage\":\"ready-touch\"", 30))
-        let move = app.coordinate(withNormalizedOffset: CGVector(dx: 0.18, dy: 0.75))
-        let moved = app.coordinate(withNormalizedOffset: CGVector(dx: 0.34, dy: 0.48))
-        move.press(forDuration: 0.15, thenDragTo: moved)
-        let aim = app.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.75))
-        let aimed = app.coordinate(withNormalizedOffset: CGVector(dx: 0.66, dy: 0.48))
-        aim.press(forDuration: 0.15, thenDragTo: aimed)
-        app.pinch(withScale: 1.6, velocity: 1)
-        XCTAssertTrue(waitLog("\"stage\":\"touch\"", 25))
+        Thread.sleep(forTimeInterval: 1.2)
+        try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/pb-shop.png"))
+        XCTAssertTrue(waitLog("\"stage\":\"ready-touch\"", 40), "duel did not reach play")
+        func pt(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+            app.coordinate(withNormalizedOffset: CGVector(dx: x, dy: y)).screenPoint
+        }
+        let exp = expectation(description: "two-sticks")
+        pbInjectTwoSticks(pt(0.18, 0.78), pt(0.32, 0.50), pt(0.82, 0.78), pt(0.66, 0.50), 1.4) { err in
+            try? (err ?? "ok").write(toFile: "/tmp/pb-inject.txt", atomically: true, encoding: .utf8)
+            exp.fulfill()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            try? XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/pb-during-touch.png"))
+        }
+        wait(for: [exp], timeout: 12)
+        XCTAssertTrue(waitLog("\"stage\":\"touch\"", 20))
         let line = try touchLine()
-        XCTAssertTrue(line.contains("\"moved\":true"), line)
-        XCTAssertFalse(line.contains("\"coins\":0"), line)
-        XCTAssertTrue(line.contains("\"watch\":true"), line)
+        let inject = (try? String(contentsOfFile: "/tmp/pb-inject.txt", encoding: .utf8)) ?? ""
+        XCTAssertTrue(line.contains("play=1"), inject + " " + line)
+        XCTAssertTrue(line.contains("\"moved\":true"), inject + " " + line)
+        XCTAssertFalse(line.contains("\"coins\":0"), inject + " " + line)
+        XCTAssertTrue(line.contains("\"watch\":true"), inject + " " + line)
+        XCTAssertTrue(line.contains("both=1"), inject + " " + line)
     }
 
     func waitLog(_ needle: String, _ seconds: TimeInterval) -> Bool {

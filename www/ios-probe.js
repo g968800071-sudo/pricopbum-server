@@ -12,10 +12,21 @@
   }
   function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
   var touchN = { start: 0, move: 0, end: 0 };
-  function noteTouch(e, kind) { if (e && e.isTrusted) touchN[kind]++; }
+  var ptrN = { touch: 0, mouse: 0, other: 0 };
+  function noteTouch(e, kind) {
+    if (!e || !e.isTrusted) return;
+    var n = kind === 'move' ? 1 : ((e.touches && e.touches.length) || (e.changedTouches && e.changedTouches.length) || 1);
+    touchN[kind] += n;
+  }
   window.addEventListener('touchstart', function (e) { noteTouch(e, 'start'); }, true);
   window.addEventListener('touchmove', function (e) { noteTouch(e, 'move'); }, true);
   window.addEventListener('touchend', function (e) { noteTouch(e, 'end'); }, true);
+  window.addEventListener('pointerdown', function (e) {
+    if (!e || !e.isTrusted) return;
+    if (e.pointerType === 'touch') ptrN.touch++;
+    else if (e.pointerType === 'mouse') ptrN.mouse++;
+    else ptrN.other++;
+  }, true);
   async function dismiss() {
     for (var i = 0; i < 6; i++) {
       var b = document.querySelector('[data-m=skip],[data-m=done]');
@@ -58,28 +69,37 @@
     var shop = document.querySelector('[data-a=shop]');
     var shopBox = shop ? shop.getBoundingClientRect() : null;
     var safe = window.__pbApp.safeInsets ? window.__pbApp.safeInsets() : { l: 0, t: 0, r: 0, b: 0 };
-    await post({ stage: 'menu', menu: (document.body.innerText || '').replace(/\s+/g, ' ').slice(0, 180), coins: window.__pbMeta.d.coins | 0, tanks: 0, moved: window.innerWidth > window.innerHeight, watch: !!shop, serverCoins: Math.round(safe.l || 0) });
+    await post({ stage: 'menu', menu: ('safe=' + Math.round(safe.l || 0) + ',' + Math.round(safe.t || 0) + ',' + Math.round(safe.r || 0) + ',' + Math.round(safe.b || 0) + (shopBox ? ' shop=' + Math.round(shopBox.x) + ',' + Math.round(shopBox.y) + ',' + Math.round(shopBox.width) + ',' + Math.round(shopBox.height) : ' shop=missing') + ' ' + (document.body.innerText || '').replace(/\s+/g, ' ')).slice(0, 180), coins: window.__pbMeta.d.coins | 0, tanks: 0, moved: window.innerWidth > window.innerHeight, watch: !!shop, serverCoins: Math.round(safe.l || 0) });
     await sleep(8000);
     var shopOpen = /магазин|shop/i.test(document.body.innerText || '');
-    await post({ stage: 'shop', watch: shopOpen, moved: window.innerWidth > window.innerHeight, coins: window.__pbMeta.d.coins | 0, tanks: shopBox ? Math.round(shopBox.width) : 0, serverCoins: Math.round((safe.t || 0) + (safe.b || 0) + (safe.l || 0) + (safe.r || 0)) });
+    await post({ stage: 'shop', watch: shopOpen, moved: window.innerWidth > window.innerHeight, coins: window.__pbMeta.d.coins | 0, tanks: shopBox ? Math.round(shopBox.width) : 0, serverCoins: Math.round((safe.t || 0) + (safe.b || 0) + (safe.l || 0) + (safe.r || 0)), menu: shopOpen ? 'shop-open' : 'shop-closed' });
     await dismiss();
     window.__pbApp.startLocal('duel', { noPre: 1 });
-    await sleep(1200);
+    var play = false;
+    for (var p = 0; p < 50; p++) {
+      var st = window.__pbApp.session && window.__pbApp.session.view && window.__pbApp.session.view.state;
+      if (st === 'play') { play = true; break; }
+      await sleep(200);
+    }
     var me0 = window.__pbApp.session && window.__pbApp.session.view && window.__pbApp.session.view.tanks.find(function (t) { return t.cid === 'me' || t.human; });
     var x0 = me0 ? me0.x : 0, y0 = me0 ? me0.y : 0, fire0 = me0 ? me0.lastFire || 0 : 0;
-    await post({ stage: 'ready-touch', tanks: window.__pbApp.session && window.__pbApp.session.view ? window.__pbApp.session.view.tanks.length : 0, coins: Math.round(x0), serverCoins: Math.round(y0) });
-    var best = { dx: 0, dy: 0, shots: 0 };
+    touchN.start = touchN.move = touchN.end = 0;
+    ptrN.touch = ptrN.mouse = ptrN.other = 0;
+    await post({ stage: 'ready-touch', tanks: window.__pbApp.session && window.__pbApp.session.view ? window.__pbApp.session.view.tanks.length : 0, coins: Math.round(x0), serverCoins: Math.round(y0), menu: play ? 'play' : 'not-play' });
+    var best = { dx: 0, dy: 0, shots: 0 }, both = false;
     for (var w = 0; w < 40; w++) {
       var me = window.__pbApp.session && window.__pbApp.session.view && window.__pbApp.session.view.tanks.find(function (t) { return t.cid === 'me' || t.human; });
+      var inp = window.__pbApp.input;
+      if (inp && Math.hypot(inp.move.x, inp.move.y) > 0.2 && (inp.fireHeld || (inp.aim && inp.aim.active))) both = true;
       if (me) {
         best.dx = Math.max(best.dx, Math.abs(me.x - x0));
         best.dy = Math.max(best.dy, Math.abs(me.y - y0));
         var bullets = (window.__pbApp.session.view.bullets || []).length;
         if ((me.lastFire || 0) > fire0 + 0.05 || bullets > 0) best.shots++;
       }
-      await sleep(400);
+      await sleep(200);
     }
-    await post({ stage: 'touch', moved: best.dx > 8 || best.dy > 8, tanks: window.__pbApp.session && window.__pbApp.session.view ? window.__pbApp.session.view.tanks.length : 0, coins: touchN.start, serverCoins: touchN.move, watch: best.shots > 0, menu: 'end=' + touchN.end + ' dx=' + Math.round(best.dx) + ' dy=' + Math.round(best.dy) });
+    await post({ stage: 'touch', moved: best.dx > 8 || best.dy > 8, tanks: window.__pbApp.session && window.__pbApp.session.view ? window.__pbApp.session.view.tanks.length : 0, coins: touchN.start, serverCoins: touchN.move, watch: best.shots > 0, menu: 'end=' + touchN.end + ' dx=' + Math.round(best.dx) + ' dy=' + Math.round(best.dy) + ' both=' + (both ? 1 : 0) + ' ptr=' + ptrN.touch + '/' + ptrN.mouse + ' play=' + (play ? 1 : 0) + ' shots=' + best.shots + ' wh=' + window.innerWidth + 'x' + window.innerHeight });
     window.__pbApp.quitToMenu();
     await sleep(800);
     window.__pbApp.net.connect('ws://127.0.0.1:' + PORT + '/ws');
