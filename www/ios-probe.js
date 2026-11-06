@@ -3,6 +3,7 @@
 // It never sends an account token.
 (function () {
   if (!window.__pbProbe) return;
+  fetch('http://127.0.0.1:8799/probe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ stage: 'boot', build: window.__pbBuild || '' }) }).catch(function () {});
   var PORT = 8799;
   function post(body) {
     body.build = window.__pbBuild || '';
