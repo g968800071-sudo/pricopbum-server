@@ -59,6 +59,14 @@ jobs:
             codesign -dv "$APP" 2>&1 || true
           } | tee "$GITHUB_WORKSPACE/ios-report/build.txt"
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pricopbum-ios-simulator-unsigned
+          if-no-files-found: error
+          path: |
+            ios-derived/Build/Products/Debug-iphonesimulator/App.app
+            ios-report
+
       - name: Boot a simulator and launch the unsigned app
         run: |
           set -euo pipefail
@@ -83,19 +91,11 @@ jobs:
           PY
           UDID=$(cat /tmp/sim-udid.txt)
           xcrun simctl boot "$UDID" || true
-          # bootstatus can wait forever if the simulator never reports a boot. Cap it.
-          perl -e 'alarm 120; exec @ARGV' xcrun simctl bootstatus "$UDID" -b
+          # First boot can sit in CoreLocation migration for several minutes. Cap it so it cannot wait forever.
+          perl -e 'alarm 480; exec @ARGV' xcrun simctl bootstatus "$UDID" -b
           APP="$GITHUB_WORKSPACE/ios-derived/Build/Products/Debug-iphonesimulator/App.app"
           xcrun simctl install "$UDID" "$APP"
           xcrun simctl launch "$UDID" studio.pricop.pricopbum | tee "$GITHUB_WORKSPACE/ios-report/launch.txt"
           sleep 3
           xcrun simctl spawn "$UDID" log show --last 20s --predicate 'subsystem CONTAINS "studio.pricop" OR processImagePath CONTAINS "App"' > "$GITHUB_WORKSPACE/ios-report/log.txt" || true
           echo "launched on simulator $UDID" | tee -a "$GITHUB_WORKSPACE/ios-report/launch.txt"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: pricopbum-ios-simulator-unsigned
-          if-no-files-found: error
-          path: |
-            ios-derived/Build/Products/Debug-iphonesimulator/App.app
-            ios-report
