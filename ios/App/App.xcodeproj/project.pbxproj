@@ -11,7 +11,6 @@
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		A1B002B01DF11E0000000001 /* TouchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F001F11EFEF00000000001 /* TouchUITests.swift */; };
-		A1B003B11DF11E0000000002 /* TouchInject.m in Sources */ = {isa = PBXBuildFile; fileRef = A1F002F21EFEF00000000002 /* TouchInject.m */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
@@ -25,8 +24,6 @@
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A1F001F11EFEF00000000001 /* TouchUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TouchUITests.swift; sourceTree = "<group>"; };
-		A1F002F21EFEF00000000002 /* TouchInject.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = TouchInject.m; sourceTree = "<group>"; };
-		A1F003F31EFEF00000000003 /* TouchInject.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TouchInject.h; sourceTree = "<group>"; };
 		A11010C0FFEE000000000001 /* TouchUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TouchUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -161,8 +158,6 @@
 			isa = PBXGroup;
 			children = (
 				A1F001F11EFEF00000000001 /* TouchUITests.swift */,
-				A1F002F21EFEF00000000002 /* TouchInject.m */,
-				A1F003F31EFEF00000000003 /* TouchInject.h */,
 			);
 			path = TouchUITests;
 			sourceTree = "<group>";
@@ -276,7 +271,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1B002B01DF11E0000000001 /* TouchUITests.swift in Sources */,
-				A1B003B11DF11E0000000002 /* TouchInject.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -498,7 +492,6 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = studio.pricop.pricopbum.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = TouchUITests/TouchInject.h;
 				SWIFT_VERSION = 5.0;
 				TEST_TARGET_NAME = App;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -514,7 +507,6 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				PRODUCT_BUNDLE_IDENTIFIER = studio.pricop.pricopbum.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
-				SWIFT_OBJC_BRIDGING_HEADER = TouchUITests/TouchInject.h;
 				SWIFT_VERSION = 5.0;
 				TEST_TARGET_NAME = App;
 				TARGETED_DEVICE_FAMILY = "1,2";

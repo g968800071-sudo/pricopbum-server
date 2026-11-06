@@ -171,6 +171,7 @@ export class App {
     this.input.reset(); this.input.enabled = true;
     this.audio.playMusic(s.mode === 'classic' ? 'classic' : 'battle');
     this.makeGameButtons();
+    if (s.extra && (s.extra.spec || s.extra.watch)) return;
     if (s.mode === 'classic') this.hud.banner('УРОВЕНЬ ' + ((s.view.level || 0) + 1), s.view.levelName, '#ffd23d', 2.2);
     else if (s.view.ffa) this.hud.banner('КАЖДЫЙ ЗА СЕБЯ', 'Первый, кто наберёт ' + s.view.target + ' уничтожений, побеждает', '#ffd23d', 2.4);
     else if (s.view.special === 'koth') this.hud.banner('ЦАРЬ ГОРЫ', 'Удерживай точку в центре · до ' + s.view.target + ' очков', '#ffd23d', 2.4);
@@ -432,8 +433,8 @@ export class App {
     this.renderer.stepFx(dt); this.hud.step(dt); if (this.qAuto && autoQuality(this.renderer, dt)) this.resize();
     const L = this.layout;
     // r15 cameras: «Дрон» (top-down, zoom), «3-е лицо» (WebGL pseudo-3D chase cam). The first-person view was dropped.
-    const S = this.meta.d.settings, R = this.renderer, cm = view.mode === 'classic' || s.p2 ? 0 : s.camLock >= 0 ? s.camLock : S.camera === 3 ? 1 : Math.min(2, S.camera ?? 0), live = me && me.alive; // r17: 0 Сверху (90° top-down), 1 3-е лицо (chase), 2 Дрон (tilted ~53°, north-up)
-    const gls = this.gls, wantGL = gls.ok && (cm >= 1 || (S.post !== false && R.quality >= 0.6));
+    const S = this.meta.d.settings, R = this.renderer, watchCam = !!(s.opts && s.opts.watch) || !!(s.extra && (s.extra.spec || s.extra.watch)), cm = watchCam ? 0 : view.mode === 'classic' || s.p2 ? 0 : s.camLock >= 0 ? s.camLock : S.camera === 3 ? 1 : Math.min(2, S.camera ?? 0), live = me && me.alive; // r17: 0 Сверху (90° top-down), 1 3-е лицо (chase), 2 Дрон (tilted ~53°, north-up). A watch camera stays top-down so the other room's terrain stays on screen.
+    const gls = this.gls, wantGL = !watchCam && gls.ok && (cm >= 1 || (S.post !== false && R.quality >= 0.6));
     if (live && cm === 1) { const tgt = me.a; if (this.camYaw == null) this.camYaw = tgt; let d = ((tgt - this.camYaw + Math.PI * 3) % (Math.PI * 2)) - Math.PI; this.camYaw += d * Math.min(1, dt * 3.2); this.camRot = this.camYaw + Math.PI / 2; } else { this.camRot = null; if (!live) this.camYaw = null; }
     let fr; const dist = R.quality >= 0.95 ? 300 : R.quality >= 0.7 ? 240 : 190;
     try { this.audio.engine(live && !this.paused ? Math.min(1, Math.hypot(me.vx || 0, me.vy || 0) / Math.max(30, me.speed || 70)) : -1, me ? voiceOf(me).eng : null, 'me');
