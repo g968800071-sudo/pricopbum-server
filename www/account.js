@@ -10,7 +10,7 @@
     if (el) return el;
     el = document.createElement('div');
     el.id = 'pb-build';
-    el.textContent = 'PRICOPBUM ' + (window.__pbBuild || '1.2.2') + ' test';
+    el.textContent = 'PRICOPBUM ' + (window.__pbBuild || '1.2.3') + ' test';
     el.style.cssText = 'position:fixed;left:8px;bottom:6px;z-index:40;font:600 11px system-ui,sans-serif;color:#ffd23d;pointer-events:none;text-shadow:0 1px 2px #000';
     document.body.appendChild(el);
     return el;
@@ -41,6 +41,7 @@
     try { if (window.__pbUi && window.__pbUi.refreshCurrency) window.__pbUi.refreshCurrency(); } catch (e) {}
   };
   window.__pbBuyTmod = function (ui, model, track, cost, apply) {
+    var key = String(model) + ':' + String(track) + ':' + String(Date.now());
     var h = ui.h || ui.app && ui.app.ui && ui.app.ui.h;
     ui.modal([
       h('h3', null, 'Модернизация за монеты'),
@@ -48,7 +49,8 @@
       ui.confirmBtns(['', 'no', 'Отмена'], ['y', 'ok', 'Списать'])
     ], function (a) {
       if (a !== 'ok') return;
-      fetch(api('/api/account/spend'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: token(), model: model, track: track }) })
+      var spendKey = key;
+      fetch(api('/api/account/spend'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token: token(), model: model, track: track, spendKey: spendKey }) })
         .then(function (r) { return r.json(); })
         .then(function (body) {
           if (!body || !body.ok) { ui.toast(body && body.error === 'coins' ? 'Не хватает монет на счёте' : 'Недоступно', 'coin'); return; }
@@ -64,6 +66,10 @@
     if ((meta.d.coins | 0) !== kept) meta.d.coins = kept;
     try { meta.save(); } catch (e) {}
     banner('Серверный счёт ' + (acc.coins | 0) + '. На устройстве ' + kept + '. Монеты устройства не зачислены.');
+    var reward = document.getElementById('pb-server-reward');
+    if (reward) reward.textContent = String(acc.coins | 0);
+    var wallet = document.getElementById('pb-device-wallet');
+    if (wallet) wallet.textContent = ' · устройство ' + kept + ' не зачислено';
     console.log('[pb-acct] ' + how + ' serverCoins=' + (acc.coins | 0) + ' deviceCoins=' + kept + ' auth=' + !!meta.d.onlineAuth + ' credited=false');
     try {
       var net = window.__pbApp && window.__pbApp.net;

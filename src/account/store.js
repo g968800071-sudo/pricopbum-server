@@ -32,6 +32,11 @@ export function openStore(file) {
       match_key TEXT NOT NULL,
       PRIMARY KEY (token, match_key)
     );
+    CREATE TABLE IF NOT EXISTS spends (
+      token TEXT NOT NULL,
+      spend_key TEXT NOT NULL,
+      PRIMARY KEY (token, spend_key)
+    );
   `);
   const cols = db.prepare('PRAGMA table_info(accounts)').all().map(c => c.name);
   if (!cols.includes('device_note')) db.exec("ALTER TABLE accounts ADD COLUMN device_note TEXT NOT NULL DEFAULT '{}'");
@@ -102,7 +107,7 @@ export function tmodForModel(db, token, modelId) {
   return acc.tmods[String(modelId | 0)] || null;
 }
 
-export function spendLegendary(db, token, modelId, track) {
+export function spendLegendary(db, token, modelId, track, spendKey) {
   const t = validToken(token);
   const row = t ? rowOf(db, t) : null;
   if (!row) return { ok: false, error: 'account' };
@@ -117,10 +122,16 @@ export function spendLegendary(db, token, modelId, track) {
   while (lv.length < TMODS.length) lv.push(0);
   if (lv[i] >= TM_MAX) return { ok: false, error: 'max', account: publicAccount(row) };
   const cost = TM_COIN[lv[i]];
+  const key = typeof spendKey === 'string' && spendKey ? String(spendKey).slice(0, 80) : '';
+  if (key) {
+    const replay = db.prepare('SELECT 1 AS x FROM spends WHERE token = ? AND spend_key = ?').get(t, key);
+    if (replay) return { ok: true, replay: true, cost: 0, account: publicAccount(row) };
+  }
   if (row.coins < cost) return { ok: false, error: 'coins', cost, account: publicAccount(row) };
   lv[i] += 1;
   tmods[String(id)] = lv;
   db.prepare('UPDATE accounts SET coins = ?, tmods = ? WHERE token = ?').run(row.coins - cost, JSON.stringify(tmods), t);
+  if (key) db.prepare('INSERT INTO spends (token, spend_key) VALUES (?, ?)').run(t, key);
   return { ok: true, cost, account: publicAccount(rowOf(db, t)) };
 }
 

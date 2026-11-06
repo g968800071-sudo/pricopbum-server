@@ -89,7 +89,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods
 function sendJson(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS }); res.end(b); }
 function getAccountSafe(token) { return getAccount(accounts, token) || { ok: false }; }
 export function serverFeatures() {
-  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGiantAdmit: admitCount('brg'), brGoal: 150, brGoalVerified: false, hostedTournament: true, tourWatch: true, tourSizes: [2, 4, 8], tourPracticeBots: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.2.2' };
+  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGiantAdmit: admitCount('brg'), brGoal: 150, brGoalVerified: false, hostedTournament: true, tourWatch: true, tourSizes: [2, 4, 8], tourPracticeBots: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.2.3' };
 }
 function applyAccountTmod(c) {
   if (!c.hello) return;
@@ -113,7 +113,7 @@ const server = http.createServer((req, res) => {
   if (u.pathname === '/api/capabilities') return sendJson(res, 200, serverFeatures());
   if (u.pathname === '/api/account' && req.method === 'GET') return sendJson(res, 200, getAccountSafe(u.searchParams.get('token')));
   if (u.pathname === '/api/account' && req.method === 'POST') { readBody(req).then((body) => { const acc = createAccount(accounts, { token: body.token, name: body.name, local: body.local }); sendJson(res, 200, acc); }).catch(() => sendJson(res, 400, { ok: false })); return; }
-  if (u.pathname === '/api/account/spend' && req.method === 'POST') { readBody(req).then((body) => sendJson(res, 200, spendLegendary(accounts, body.token, body.model, body.track))).catch(() => sendJson(res, 400, { ok: false })); return; }
+  if (u.pathname === '/api/account/spend' && req.method === 'POST') { readBody(req).then((body) => sendJson(res, 200, spendLegendary(accounts, body.token, body.model, body.track, body.spendKey))).catch(() => sendJson(res, 400, { ok: false })); return; }
   if (u.pathname === '/privacy' || u.pathname === '/privacy/') { try { const b = fs.readFileSync(path.join(WWW, 'privacy.html')); res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); return res.end(b); } catch (e) { res.writeHead(404); return res.end('not found'); } }
   if (u.pathname === '/healthz') { res.writeHead(200, { 'content-type': 'text/plain' }); return res.end('PRICOPBUM server OK'); }
   if (u.pathname === '/health') { const mem = process.memoryUsage(); res.writeHead(200, { 'content-type': 'application/json', ...CORS }); return res.end(JSON.stringify({ ok: true, players: clients.size, rooms: rooms.size, privateRooms: codes.size, stepMs: +stepStat.avg.toFixed(3), stepMaxMs: +stepStat.max.toFixed(3), maxTanks: MAX_TANKS, netHz: NET_HZ, rssMb: Math.round(mem.rss / 1048576), heapMb: Math.round(mem.heapUsed / 1048576), features: serverFeatures(), list: [...rooms.values()].map(r => ({ id: r.id, variant: r.mode, humans: r.members.size, tanks: r.host.world.tanks.length, alive: r.host.world.tanks.filter(t => t.alive).length })) })); }

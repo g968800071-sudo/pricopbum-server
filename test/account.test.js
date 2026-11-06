@@ -63,6 +63,29 @@ test('online match credit uses the server formula and does not pay twice', () =>
   assert.ok(once.rp > 0);
 });
 
+test('a match credit, relaunch and legendary spend do not double-award', () => {
+  const a = createAccount(db, { local: { coins: 20, rp: 40, kills: 9 } });
+  assert.equal(a.coins, 0);
+  const summary = { mode: 'team', win: false, kills: 0, place: 0, total: 2 };
+  const first = creditMatch(db, a.token, 'room-draw', summary);
+  const replay = creditMatch(db, a.token, 'room-draw', summary);
+  assert.equal(first.coins, matchCoins(summary));
+  assert.equal(first.coins, 3);
+  assert.equal(replay.coins, first.coins);
+  assert.equal(replay.matches, 1);
+  const again = createAccount(db, { token: a.token, name: 'Ana' });
+  assert.equal(again.coins, 3);
+  const rich = creditMatch(db, a.token, 'room-fund', { mode: 'team', win: true, kills: 80, place: 0, total: 4 });
+  const spent = spendLegendary(db, a.token, leg, 0, 'buy-once');
+  const spentAgain = spendLegendary(db, a.token, leg, 0, 'buy-once');
+  assert.equal(spent.ok, true);
+  assert.equal(spent.account.coins, rich.coins - 100);
+  assert.equal(spent.account.tmods[String(leg)][0], 1);
+  assert.equal(spentAgain.replay, true);
+  assert.equal(spentAgain.account.coins, spent.account.coins);
+  assert.equal(spentAgain.account.tmods[String(leg)][0], 1);
+});
+
 test('legendaryTmods drops non-legendary rows', () => {
   const out = legendaryTmods({ [leg]: [1, 2, 0, 0, 9], [myth]: [1, 1, 1, 1, 1], 3: [1, 0, 0, 0, 0] });
   assert.deepEqual(out[String(leg)], [1, 2, 0, 0, 5]);

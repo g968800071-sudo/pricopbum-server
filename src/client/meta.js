@@ -23,6 +23,7 @@ export const tankLv = (xp) => Math.min(TANK_LV_MAX, 1 + Math.floor(Math.sqrt((xp
 export const tankLvFx = (lv) => { const k = Math.min(TANK_LV_MAX - 1, Math.max(0, lv - 1)) * 0.005; return k ? { rel: +(1 - k).toFixed(4), spread: +(1 - k).toFixed(4), arm: +(1 + k).toFixed(4) } : null; };
 // Progression, economy, daily rewards, missions, achievements. Saved in localStorage.
 import { botEcoEarn } from './tankmods.js';
+import { matchCoins } from '../sim/progress.js';
 import { WEAPON_PRICE, UPGRADE_COST, UPGRADES, SKINS, WEAPON_LIST } from '../sim/defs.js';
 const KEY = 'pricopbum_save';
 const today = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
@@ -85,9 +86,9 @@ export class Meta {
   addCoins(n, earned = true) { this.d.coins += n; if (earned && n > 0) this.d.stats.coinsEarned += n; this.save(); }
   addGems(n) { this.d.gems += n; this.save(); }
   spend(cur, n) { if (this.d[cur] < n) return false; this.d[cur] -= n; this.save(); return true; }
-  addXp(n) {
+  addXp(n, mintCoins = true) {
     const ups = []; this.d.xp += n; const bp = this.d.bp || (this.d.bp = { xp: 0, fc: [], pc: [], prem: false }); bp.xp += n;
-    while (this.d.xp >= xpNeed(this.d.level)) { this.d.xp -= xpNeed(this.d.level); this.d.level++; const r = { coins: 5 + Math.floor(this.d.level / 2), gems: this.d.level % 5 === 0 ? 3 : 0 }; this.d.coins += r.coins; this.d.gems += r.gems; ups.push({ level: this.d.level, ...r }); }
+    while (this.d.xp >= xpNeed(this.d.level)) { this.d.xp -= xpNeed(this.d.level); this.d.level++; const r = { coins: mintCoins ? 5 + Math.floor(this.d.level / 2) : 0, gems: this.d.level % 5 === 0 ? 3 : 0 }; if (mintCoins) this.d.coins += r.coins; this.d.gems += r.gems; ups.push({ level: this.d.level, ...r }); }
     this.save(); return ups;
   }
   // r20: garage weapons and upgrades bought with coins are ONE-MATCH («на 1 бой»); previously owned ones stay
@@ -135,19 +136,22 @@ export class Meta {
     } else if (r.mode === 'team') { coins = killCoins(r.kills) + (r.win ? (r.variant === 'moba' ? 8 : 4) : 0); xp = (r.win ? 80 : 40) + r.kills * 8; if (r.win) st.teamWins++; }
     else { coins = killCoins(r.kills) + r.classicLevels * 3; xp = 20 + r.kills * 6 + r.classicLevels * 50; st.classicLevels += r.classicLevels; }
     coins += 3 + (r.win || r.place === 1 ? 18 : 0); // r37: small coins every battle + win bonus (win ≈ 20–40) (spent on permanent legendary mods)
-    // Online matches pay the server ledger only. Device coins stay where they were.
+    const serverCoins = r.online ? matchCoins(r) : 0;
+    // Online matches pay the server ledger only. Device coins and device rank stay where they were.
     if (r.online) { xp = Math.round(xp * 1.2); coins = 0; }
-    if (r.rew && r.rew !== 1) { coins = Math.round(coins * r.rew); xp = Math.round(xp * r.rew); }
+    if (r.rew && r.rew !== 1 && !r.online) { coins = Math.round(coins * r.rew); xp = Math.round(xp * r.rew); }
     const missionsDone = [];
     missionsDone.push(...this.progress('kills', r.kills), ...this.progress('damage', Math.round(r.damage)), ...this.progress('matches', 1), ...this.progress('pickups', r.pickups || 0), ...this.progress('crates', r.crates || 0));
     if (r.mode === 'br' && r.place <= 10) missionsDone.push(...this.progress('br_top10', 1));
     if (r.mode === 'team' && r.win) missionsDone.push(...this.progress('team_win', 1));
     if (r.mode === 'classic' && r.classicLevels) missionsDone.push(...this.progress('classic_lv', r.classicLevels));
     this.d.ads.matchesSince++;
-    const tx = this.d.tankXp || (this.d.tankXp = {}), mk = String(this.d.model ?? 0), tl0 = tankLv(tx[mk]); tx[mk] = (tx[mk] || 0) + xp; const tl1 = tankLv(tx[mk]); const RI0 = rankInfo(this.d), rk0 = RI0.name; const rpD = rpDelta(r); this.d.rp = Math.max(0, (this.d.rp || 0) + rpD);
+    const tx = this.d.tankXp || (this.d.tankXp = {}), mk = String(this.d.model ?? 0), tl0 = tankLv(tx[mk]); tx[mk] = (tx[mk] || 0) + xp; const tl1 = tankLv(tx[mk]); const RI0 = rankInfo(this.d), rk0 = RI0.name; const rpD = rpDelta(r); if (!r.online) this.d.rp = Math.max(0, (this.d.rp || 0) + rpD);
     // r25: battle-limited items (pass rewards / coin purchases) count down one battle
     let crLost = 0, crKept = 0; if (this.d.tmp) { const W = !!r.win || (r.mode === 'br' && r.place && r.total && r.place <= Math.max(1, Math.ceil(r.total * 0.1))); for (const it of this.d.tmp) { if (it.crate) { if (W && !it.fresh) crKept++; else if (!it.fresh) { it.n = 0; crLost++; } it.fresh = 0; } else it.n--; } this.d.tmp = this.d.tmp.filter(it => it.n > 0); } // r26: crate items stay while you keep winning, vanish on the first loss
-    botEcoEarn(this.d, coins);     this.addCoins(coins); const ups = this.addXp(xp); const ach = this.checkAch();
-    const RI1 = rankInfo(this.d); return { coins, xp, ups, ach, missionsDone, tl0, tl1, rk0, rk1: RI1.name, rpD, crLost, crKept, promo: RI1.i > RI0.i, demo: RI1.i < RI0.i, rpct: RI1.pct, rnext: RI1.next, ri: RI1.i };
+    const deviceCoins = this.d.coins | 0;
+    botEcoEarn(this.d, coins); this.addCoins(coins); const ups = this.addXp(xp, !r.online); const ach = this.checkAch();
+    if (r.online && (this.d.coins | 0) !== deviceCoins) this.d.coins = deviceCoins;
+    const RI1 = rankInfo(this.d); return { coins, serverCoins, deviceCoins: this.d.coins | 0, online: !!r.online, xp, ups, ach, missionsDone, tl0, tl1, rk0, rk1: RI1.name, rpD: r.online ? rpD : rpD, crLost, crKept, promo: !r.online && RI1.i > RI0.i, demo: !r.online && RI1.i < RI0.i, rpct: RI1.pct, rnext: RI1.next, ri: RI1.i };
   }
 }
