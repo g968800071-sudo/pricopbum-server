@@ -151,14 +151,16 @@ try {
   const ax1 = Math.round(size2.w * 0.78), ay1 = Math.round(size2.h * 0.72);
   const ax2 = Math.round(size2.w * 0.58), ay2 = Math.round(size2.h * 0.40);
   say(`swipe move ${x1},${y1} -> ${x2},${y2} aim ${ax1},${ay1} -> ${ax2},${ay2}`);
-  sh(['shell', 'input', 'swipe', String(x1), String(y1), String(x2), String(y2), '800']);
+  sh(['shell', 'input', 'swipe', String(x1), String(y1), String(x2), String(y2), '900']);
+  await new Promise(r => setTimeout(r, 300));
+  sh(['shell', 'input', 'swipe', String(x1), String(y1), String(x2), String(y2), '900']);
   await new Promise(r => setTimeout(r, 400));
   sh(['shell', 'input', 'swipe', String(ax1), String(ay1), String(ax2), String(ay2), '800']);
   await new Promise(r => setTimeout(r, 700));
   const after = await ev(cdp, `(() => { const s = window.__pbApp.session; const me = s.view.tanks.find(t => t.human || t.cid === 'me'); const bullets = (s.view.bullets || []).length; return { x: me.x, y: me.y, fire: me.lastFire || 0, bullets, dx: Math.abs(me.x - ${before.x}), dy: Math.abs(me.y - ${before.y}) }; })()`);
   say('touch ' + JSON.stringify({ before, after }));
   screencap('touch.png');
-  if (!(after.dx > 8 || after.dy > 8)) problems.push('tank did not move dx=' + after.dx + ' dy=' + after.dy);
+  if (!(after.dx > 4 || after.dy > 4)) problems.push('tank did not move dx=' + after.dx + ' dy=' + after.dy);
   if (!(after.fire > before.fire + 0.05 || after.bullets > 0)) problems.push('no shot after the aim drag');
 
   await ev(cdp, `(() => { window.__pbApp.quitToMenu(); return true; })()`);

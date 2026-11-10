@@ -168,7 +168,7 @@ export class App {
   pickAtmo() { const w = this.meta.d.settings.weather ?? 0, ids = ['day', 'dusk', 'night', 'rain', 'fog', 'snow']; this.renderer.atmo = w === 1 ? 'day' : w >= 2 ? ids[w - 2] : (Math.random() < 0.3 ? 'day' : ids[Math.floor(Math.random() * ids.length)]); this.renderer.wrecks = []; }
   startSession(session) { this.ui.fade(() => { this.endOverlay(); this.ui.clear(); if (this.session) this.session.destroy(); this.session = session; this.pickAtmo(); this.beginSession(); }); }
   beginSession() {
-    this.closeModals(); const s = this.session; this.state = 'game'; if (this.hud) this.hud.banners = []; { const d = this.meta.d; if (d.mb) d.mb = null; if (d.itemsTmp && d.itemsTmp.length) { const T = new Set(d.itemsTmp); d.items = (d.items || []).filter(x => !T.has(x)); for (const k in d.itemEq || {}) if (T.has(d.itemEq[k])) delete d.itemEq[k]; d.itemsTmp = []; } this.meta.save(); } // r20: one-match purchases are consumed by this match this.computeLayout(); this.hud = new Hud(); this.hud.chatMode = this.meta.d.settings.chat ?? 1; this.renderer.setMap(s.view.map, s.mode); this.renderer._camInit = false;
+    this.wrap.classList.remove('result-open'); this.closeModals(); const s = this.session; this.state = 'game'; if (this.hud) this.hud.banners = []; { const d = this.meta.d; if (d.mb) d.mb = null; if (d.itemsTmp && d.itemsTmp.length) { const T = new Set(d.itemsTmp); d.items = (d.items || []).filter(x => !T.has(x)); for (const k in d.itemEq || {}) if (T.has(d.itemEq[k])) delete d.itemEq[k]; d.itemsTmp = []; } this.meta.save(); } // r20: one-match purchases are consumed by this match this.computeLayout(); this.hud = new Hud(); this.hud.chatMode = this.meta.d.settings.chat ?? 1; this.renderer.setMap(s.view.map, s.mode); this.renderer._camInit = false;
     this.stats = { kills: 0, damage: 0, pickups: 0, crates: 0, classicLevels: this.stats && s.extra && s.extra.level ? this.stats.classicLevels : 0 };
     if (!(s.extra && s.extra.level)) this.stats.classicLevels = 0;
     this.deadT = 0; this.overShown = false; this.lastCount = -1; this.revived = this.revived && s.extra && s.extra.level ? this.revived : false; this.spectate = 0; this.tapPending = 0;
@@ -347,7 +347,7 @@ export class App {
     } });
   }
   quitToMenu() {
-    const s = this.session; if (s && s.online && s.leave) s.leave(); this.wrap.classList.remove('watching'); if (this.specEls) this.specEnd();
+    const s = this.session; if (s && s.online && s.leave) s.leave(); this.wrap.classList.remove('watching'); this.wrap.classList.remove('result-open'); if (this.specEls) this.specEnd();
     this.ui.fade(() => { this.closeModals(); this.state = 'menu'; if (this.gls && this.gls.ok) this.gls.cv.style.display = 'none'; this.camRot = null; if (this.session) this.session.destroy(); this.session = null; this.endOverlay(); this.computeLayout(); this.renderer.setMap(this.attract.map, 'team'); this.ui.menu(); });
   }
   onKey(k) {
@@ -675,7 +675,7 @@ export class App {
       const go = () => { if (a === 'again') { if (s.online && s.requeue) { s.requeue(); this.quitToMenuThen(() => this.net.quickMatch(view.variant || mode)); } else this.startLocal(s.variant || mode); } else this.quitToMenu(); };
       this.Ads.maybeInterstitial('after_match').then(go);
     }, { dismiss: false });
-    ov.classList.add('res');
+    ov.classList.add('res'); this.wrap.classList.add('result-open');
     // count-up animation
     for (const el of ov.querySelectorAll('[data-cnt]')) { const target = +el.dataset.cnt; const t0 = performance.now(); const tick = () => { const k = Math.min(1, (performance.now() - t0) / 900); el.textContent = Math.round(target * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(tick); else this.audio.play('coin', 0.6); }; setTimeout(tick, 300); }
     setTimeout(() => { for (const u of r.ups) { this.audio.play('levelup'); this.ui.toast('Новый уровень ' + u.level + '! +' + u.coins + ' монет, +' + u.gems + ' кристаллов', 'star'); } for (const a of r.ach) this.ui.achToast(a); for (const m of r.missionsDone) this.ui.toast('Задание выполнено: ' + m.text, 'check'); }, 1300);

@@ -229,10 +229,9 @@ table.odds{width:100%;border-collapse:collapse;font-size:12px}table.odds td,tabl
 @media (orientation:landscape) and (max-height:600px){.pcb .scr[data-name=tanks]{display:grid;grid-template-columns:minmax(240px,38%) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);column-gap:12px;overflow:hidden}.pcb .scr[data-name=tanks]>.hdr{grid-column:1/-1}.pcb .scr[data-name=tanks] .tleft{display:flex;flex-direction:column;min-height:0;overflow-y:auto;position:relative;z-index:2;padding-bottom:6px}.pcb .scr[data-name=tanks] .tright{display:flex;flex-direction:column;min-height:0;min-width:0;position:relative;z-index:2}.pcb .scr[data-name=tanks] .tprev{height:96px;flex:none}.pcb .scr[data-name=tanks] .tact .btn.big{min-height:44px;padding:8px 10px;font-size:15px}.pcb .scr[data-name=tanks] .chips{margin:0 0 4px}.pcb .tbuy .modal{display:grid;grid-template-columns:80px 1fr;column-gap:12px;align-items:center;text-align:left;width:min(100%,520px);padding:10px 14px}.pcb .tbuy .tbuyimg{grid-row:1/span 4;width:80px;height:80px}.pcb .tbuy .btns{grid-column:1/-1;flex-direction:row;flex-wrap:wrap}.pcb .tbuy .btns .btn{flex:1 1 140px;min-height:44px}.pcb .tbuy .big-title{font-size:22px!important}}
 .tmrow{display:flex;align-items:center;gap:10px}.tmic{font-size:26px;width:36px;text-align:center}.tmpips{display:flex;gap:4px;margin-top:4px}.tmpips i{width:16px;height:6px;border-radius:3px;background:#3a4250}.tmpips i.on{background:#ffb02e;box-shadow:0 0 6px #ffb02e}
 .pcb.screen-open .pcb-game{visibility:hidden!important;pointer-events:none!important}
-.pcb.screen-open .pcb-ui{z-index:30;transform:translateZ(0)}
+.pcb.screen-open .pcb-ui{z-index:30}
 .pcb canvas.pcb-cv{z-index:0}
-.pcb.screen-open>canvas.pcb-cv,.pcb:has(.ov.res)>canvas.pcb-cv{visibility:hidden!important}
-.pcb .ov{transform:translateZ(0)}
+.pcb.screen-open>canvas.pcb-cv,.pcb.result-open>canvas.pcb-cv{visibility:hidden!important}
 .pcb .scr[data-name=shop]{background:#0b1018;z-index:12}
 .pcb .scr[data-name=shop]>.menu-bg{background:#0b1018}
 .pcb .scr[data-name=shop]>.hdr{position:sticky;top:0;z-index:8;background:#0b1018;padding:2px 0 8px;margin:0;flex:none}
