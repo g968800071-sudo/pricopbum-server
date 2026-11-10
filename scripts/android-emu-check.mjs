@@ -97,14 +97,24 @@ try {
   }
   if (!await ev(cdp, '!!window.__pbApp')) throw new Error('game did not boot');
   await ev(cdp, `(() => {
-    const app = window.__pbApp;
     const d = new Date();
-    app.meta.d.onboarded = 1;
-    app.meta.d.daily = app.meta.d.daily || {};
-    app.meta.d.daily.last = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
-    app.meta.save();
+    const today = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+    let cur = {};
+    try { cur = JSON.parse(localStorage.getItem('pricopbum_save') || '{}'); } catch (e) {}
+    cur.onboarded = 1;
+    cur.settings = Object.assign({}, cur.settings, { lang: 'ru' });
+    cur.daily = Object.assign({}, cur.daily, { last: today });
+    localStorage.setItem('pricopbum_save', JSON.stringify(cur));
+    location.reload();
+    return true;
+  })()`);
+  for (let i = 0; i < 40; i++) {
+    if (await ev(cdp, '!!(window.__pbApp && window.__pbApp.ui && window.__pbApp.state)')) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  await ev(cdp, `(() => {
     document.querySelectorAll('.studio,.ov').forEach(n => n.remove());
-    app.ui.shop();
+    window.__pbApp.ui.shop();
     return true;
   })()`);
   await new Promise(r => setTimeout(r, 800));
