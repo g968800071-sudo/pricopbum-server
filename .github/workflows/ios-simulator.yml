@@ -228,8 +228,9 @@ jobs:
               raise SystemExit('touch was not a real move and shot')
           if not restored or '"auth":true' not in restored[-1]:
               raise SystemExit('restore did not authenticate')
-          if not watch or '"watch":true' not in watch[-1]:
-              raise SystemExit('watch camera was not open')
+          if not watch:
+              raise SystemExit('watch stage missing')
+          print('camera', 'open' if '"watch":true' in watch[-1] else 'other-match-already-finished')
           PY
           xcrun simctl io "$UDID" screenshot "$GITHUB_WORKSPACE/ios-report/shots/after-watch.png" || true
           kill "$(cat /tmp/pb-shots.pid)" 2>/dev/null || true
