@@ -303,6 +303,7 @@ try {
       ov.style.zIndex = '100';
       ov.style.background = '#10151d';
     }
+    document.querySelectorAll('.crtxt').forEach(t => { t.style.transition = 'none'; t.style.opacity = '1'; });
     document.querySelectorAll('canvas').forEach(c => { c.style.display = 'none'; });
     document.querySelectorAll('.pcb-game').forEach(g => { g.style.display = 'none'; });
     document.body.offsetHeight;
