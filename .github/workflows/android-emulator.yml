@@ -45,7 +45,7 @@ jobs:
         run: npm run smoke
 
       - name: Build the web bundle
-        run: npm run build && npx cap copy android
+        run: npm run build && npx cap sync android
 
       - name: Build the debug APK
         run: |
