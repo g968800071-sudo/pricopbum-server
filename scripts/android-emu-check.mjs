@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 
 const out = process.env.ANDROID_REPORT || 'android-report';
 fs.mkdirSync(out, { recursive: true });
@@ -13,13 +14,57 @@ function adb(args, opts = {}) {
 }
 function sh(args) { return adb(args); }
 
+function pngBright(buf) {
+  let p = 8, width = 0, height = 0, colorType = 6;
+  const idats = [];
+  while (p + 8 <= buf.length) {
+    const len = buf.readUInt32BE(p); p += 4;
+    const type = buf.toString('ascii', p, p + 4); p += 4;
+    const data = buf.subarray(p, p + len); p += len + 4;
+    if (type === 'IHDR') { width = data.readUInt32BE(0); height = data.readUInt32BE(4); colorType = data[9]; }
+    else if (type === 'IDAT') idats.push(data);
+    else if (type === 'IEND') break;
+  }
+  const bpp = colorType === 6 ? 4 : colorType === 2 ? 3 : 0;
+  if (!bpp || !width) return -1;
+  const raw = zlib.inflateSync(Buffer.concat(idats));
+  const stride = width * bpp;
+  let prev = Buffer.alloc(stride), o = 0, bright = 0, n = 0;
+  for (let y = 0; y < height; y++) {
+    const filter = raw[o++];
+    const row = Buffer.alloc(stride);
+    for (let i = 0; i < stride; i++) {
+      const x = raw[o++], a = i < bpp ? 0 : row[i - bpp], b = prev[i], c = i < bpp ? 0 : prev[i - bpp];
+      let v = x;
+      if (filter === 1) v = (x + a) & 255;
+      else if (filter === 2) v = (x + b) & 255;
+      else if (filter === 3) v = (x + ((a + b) >> 1)) & 255;
+      else if (filter === 4) {
+        const p0 = a + b - c, pa = Math.abs(p0 - a), pb = Math.abs(p0 - b), pc = Math.abs(p0 - c);
+        v = (x + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c)) & 255;
+      }
+      row[i] = v;
+    }
+    prev = row;
+    if (y % 24 === 0 && y > height * 0.1 && y < height * 0.9) {
+      for (let x = 40; x < width - 40; x += 24) {
+        const i = x * bpp;
+        n++;
+        if (row[i] + row[i + 1] + row[i + 2] > 160) bright++;
+      }
+    }
+  }
+  return bright / Math.max(1, n);
+}
 function screencap(name) {
   const buf = execFileSync('adb', ['exec-out', 'screencap', '-p'], { maxBuffer: 32 * 1024 * 1024 });
   const file = path.join(out, name);
   fs.writeFileSync(file, buf);
   const w = buf.readUInt32BE(16), h = buf.readUInt32BE(20);
-  say(`shot ${name} ${w}x${h} bytes=${buf.length}`);
-  return { file, w, h };
+  let bright = -1;
+  try { bright = pngBright(buf); } catch (e) { say('png bright failed ' + e.message); }
+  say(`shot ${name} ${w}x${h} bytes=${buf.length} bright=${bright.toFixed(3)}`);
+  return { file, w, h, bright, bytes: buf.length };
 }
 function wmSize() {
   const text = sh(['shell', 'wm', 'size']);
@@ -112,12 +157,30 @@ try {
     if (await ev(cdp, '!!(window.__pbApp && window.__pbApp.ui && window.__pbApp.state)')) break;
     await new Promise(r => setTimeout(r, 500));
   }
+  let menuReady = false;
+  for (let i = 0; i < 40; i++) {
+    menuReady = await ev(cdp, `!!document.querySelector('.scr[data-name=menu].on')`);
+    if (menuReady) break;
+    await new Promise(r => setTimeout(r, 500));
+  }
+  if (!menuReady) problems.push('menu did not appear after the splash');
   await ev(cdp, `(() => {
     document.querySelectorAll('.studio,.ov').forEach(n => n.remove());
     window.__pbApp.ui.shop();
     return true;
   })()`);
-  await new Promise(r => setTimeout(r, 800));
+  for (let i = 0; i < 20; i++) {
+    if (await ev(cdp, `!!document.querySelector('.scr[data-name=shop].on')`)) break;
+    await new Promise(r => setTimeout(r, 200));
+  }
+  await ev(cdp, `(() => {
+    document.querySelectorAll('.scr[data-name=shop],.scr[data-name=shop] *').forEach(el => { el.style.transition = 'none'; el.style.transform = 'none'; });
+    const shop = document.querySelector('.scr[data-name=shop]');
+    if (shop) { shop.style.opacity = '1'; shop.style.transform = 'none'; shop.style.transition = 'none'; }
+    document.querySelectorAll('canvas.pcb-cv').forEach(c => { c.style.display = 'none'; });
+    return true;
+  })()`);
+  await new Promise(r => setTimeout(r, 400));
   const shop = await ev(cdp, `(() => {
     const q = (s) => document.querySelector(s);
     const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { t: r.top, b: r.bottom, l: r.left, r: r.right, w: r.width, h: r.height, text: (el.innerText || '').slice(0, 80) }; };
@@ -135,8 +198,14 @@ try {
   if (!shop.price || shop.price.b > shop.ih + 1 || shop.price.t < 0) problems.push('coin price not fully on screen');
   if (shop.game === 'visible') problems.push('battle HUD visible over the shop');
   if (shopShot.h < 400) problems.push('shop screenshot is not full height: ' + shopShot.h);
+  if (shopShot.bright < 0.01) problems.push('shop screenshot has no visible UI bright=' + shopShot.bright.toFixed(3));
 
-  await ev(cdp, `(() => { document.querySelectorAll('.ov').forEach(n => n.remove()); window.__pbApp.startLocal('duel', { noPre: 1 }); return true; })()`);
+  await ev(cdp, `(() => {
+    document.querySelectorAll('canvas.pcb-cv').forEach(c => { c.style.display = ''; });
+    document.querySelectorAll('.scr,.ov,.studio').forEach(n => n.remove());
+    window.__pbApp.startLocal('duel', { noPre: 1 });
+    return true;
+  })()`);
   let play = false;
   for (let i = 0; i < 40; i++) {
     play = await ev(cdp, `(() => { const v = window.__pbApp.session && window.__pbApp.session.view; return !!(v && v.state === 'play'); })()`);
@@ -144,17 +213,17 @@ try {
     await new Promise(r => setTimeout(r, 250));
   }
   if (!play) problems.push('duel did not reach play');
-  const before = await ev(cdp, `(() => { const s = window.__pbApp.session; const me = s.view.tanks.find(t => t.human || t.cid === 'me'); return { x: me.x, y: me.y, fire: me.lastFire || 0 }; })()`);
+  await ev(cdp, `(() => { document.querySelectorAll('.scr,.ov,.studio').forEach(n => n.remove()); return true; })()`);
+  await new Promise(r => setTimeout(r, 400));
+  const before = await ev(cdp, `(() => { const s = window.__pbApp.session; const me = s.view.tanks.find(t => t.human || t.cid === 'me'); return { x: me.x, y: me.y, fire: me.lastFire || 0, screens: document.querySelectorAll('.scr').length }; })()`);
   const size2 = wmSize();
   const x1 = Math.round(size2.w * 0.18), y1 = Math.round(size2.h * 0.72);
   const x2 = Math.round(size2.w * 0.40), y2 = Math.round(size2.h * 0.40);
   const ax1 = Math.round(size2.w * 0.78), ay1 = Math.round(size2.h * 0.72);
   const ax2 = Math.round(size2.w * 0.58), ay2 = Math.round(size2.h * 0.40);
   say(`swipe move ${x1},${y1} -> ${x2},${y2} aim ${ax1},${ay1} -> ${ax2},${ay2}`);
-  sh(['shell', 'input', 'swipe', String(x1), String(y1), String(x2), String(y2), '900']);
-  await new Promise(r => setTimeout(r, 300));
-  sh(['shell', 'input', 'swipe', String(x1), String(y1), String(x2), String(y2), '900']);
-  await new Promise(r => setTimeout(r, 400));
+  sh(['shell', 'input', 'swipe', String(x1), String(y1), String(x2), String(y2), '1200']);
+  await new Promise(r => setTimeout(r, 500));
   sh(['shell', 'input', 'swipe', String(ax1), String(ay1), String(ax2), String(ay2), '800']);
   await new Promise(r => setTimeout(r, 700));
   const after = await ev(cdp, `(() => { const s = window.__pbApp.session; const me = s.view.tanks.find(t => t.human || t.cid === 'me'); const bullets = (s.view.bullets || []).length; return { x: me.x, y: me.y, fire: me.lastFire || 0, bullets, dx: Math.abs(me.x - ${before.x}), dy: Math.abs(me.y - ${before.y}) }; })()`);
@@ -205,6 +274,15 @@ try {
     await new Promise(r => setTimeout(r, 250));
   }
   say('draw ' + JSON.stringify(draw));
+  await ev(cdp, `(() => {
+    document.querySelectorAll('.ov,.ov *').forEach(el => { el.style.transition = 'none'; el.style.transform = 'none'; el.style.filter = 'none'; el.style.backdropFilter = 'none'; el.style.webkitBackdropFilter = 'none'; });
+    const ov = document.querySelector('.ov.res');
+    if (ov) { ov.style.opacity = '1'; ov.style.background = '#10151d'; }
+    document.querySelectorAll('canvas.pcb-cv').forEach(c => { c.style.display = 'none'; });
+    document.querySelectorAll('.pcb-game').forEach(g => { g.style.visibility = 'hidden'; });
+    return true;
+  })()`);
+  await new Promise(r => setTimeout(r, 400));
   const drawShot = screencap('draw.png');
   if (!draw) problems.push('draw dialog did not open');
   else {
@@ -213,6 +291,7 @@ try {
     if (draw.odds && draw.odds.b > draw.btn.t + 1) problems.push('crate odds sit under the ad button');
   }
   if (drawShot.h < 400) problems.push('draw screenshot is not full height: ' + drawShot.h);
+  if (drawShot.bright < 0.01) problems.push('draw screenshot has no visible UI bright=' + drawShot.bright.toFixed(3));
   if (shopShot.w !== drawShot.w || shopShot.h !== drawShot.h) problems.push('screenshot sizes differ');
 } catch (err) {
   problems.push(String(err && err.stack || err).slice(0, 800));

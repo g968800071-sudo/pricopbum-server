@@ -134,7 +134,7 @@ const CSS0 = `
 .pcb .stat .sb i{display:block;height:100%;background:linear-gradient(90deg,#29c4ff,#5dff8a);border-radius:3px;transition:width .4s}
 .pcb .prog{height:8px;border-radius:4px;background:rgba(255,255,255,.1);overflow:hidden;margin-top:6px}
 .pcb .prog i{display:block;height:100%;background:linear-gradient(90deg,#ffd23d,#ff8a1f);border-radius:4px}
-.pcb .ov{position:absolute;top:0;right:0;bottom:0;left:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;background:rgba(4,6,10,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);opacity:0;transition:opacity .22s;padding:calc(var(--sa-t, 0px) + 56px) calc(var(--sa-r, 0px) + 10px) calc(var(--sa-b, 0px) + 8px) calc(var(--sa-l, 0px) + 10px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.pcb .ov{position:absolute;top:0;right:0;bottom:0;left:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;background:rgba(4,6,10,.78);opacity:0;transition:opacity .22s;padding:calc(var(--sa-t, 0px) + 56px) calc(var(--sa-r, 0px) + 10px) calc(var(--sa-b, 0px) + 8px) calc(var(--sa-l, 0px) + 10px);overflow-y:auto;-webkit-overflow-scrolling:touch}
 .pcb .ov.on{opacity:1}
 .pcb .modal{width:min(100%,560px);max-height:100%;min-height:0;overflow-y:auto;background:linear-gradient(180deg,#223044,#151c27);border:1px solid rgba(255,255,255,.12);border-radius:24px;padding:12px 14px 8px;box-shadow:0 20px 60px rgba(0,0,0,.6);transform:scale(.9) translateY(10px);transition:transform .3s cubic-bezier(.2,1.4,.4,1);text-align:center;touch-action:pan-y;margin:auto}
 .pcb .modal .btns{position:sticky;bottom:0;z-index:2;background:linear-gradient(180deg,rgba(21,28,39,0),#151c27 28%);padding-top:10px}
