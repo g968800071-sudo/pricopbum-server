@@ -99,8 +99,12 @@ jobs:
           PB_PROBE=1 PB_PROBE_LOG=/tmp/pb-probe.jsonl PORT=8799 ACCOUNT_DB=/tmp/pb-ios-probe.sqlite QUEUE_SECONDS=120 node server/server.js > "$GITHUB_WORKSPACE/ios-report/server.log" 2>&1 &
           echo $! > /tmp/pb-ios-server.pid
           trap 'cp /tmp/pb-probe.jsonl "$GITHUB_WORKSPACE/ios-report/probe.jsonl" 2>/dev/null || true; mkdir -p "$GITHUB_WORKSPACE/ios-report/shots"; cp /tmp/pb-shop.png /tmp/pb-during-touch.png /tmp/pb-inject.txt "$GITHUB_WORKSPACE/ios-report/shots/" 2>/dev/null || true' EXIT
-          for i in 1 2 3 4 5 6 7 8 9 10; do curl -sf http://127.0.0.1:8799/health >/dev/null && break; sleep 1; done
-          curl -sf http://127.0.0.1:8799/health >/dev/null || { echo 'throwaway server did not start'; cat "$GITHUB_WORKSPACE/ios-report/server.log" || true; exit 1; }
+          ok=0
+          for i in $(seq 1 30); do
+            if curl --noproxy '*' -sf http://127.0.0.1:8799/health >/dev/null; then ok=1; break; fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then echo 'throwaway server did not start'; cat "$GITHUB_WORKSPACE/ios-report/server.log" || true; curl --noproxy '*' -sv http://127.0.0.1:8799/health || true; exit 1; fi
           mkdir -p "$GITHUB_WORKSPACE/ios-report/shots"
           python3 - << 'PY'
           from pathlib import Path
@@ -167,8 +171,8 @@ jobs:
           PB_PROBE=1 PB_PROBE_LOG=/tmp/pb-probe.jsonl PORT=8799 ACCOUNT_DB=/tmp/pb-ios-probe.sqlite QUEUE_SECONDS=120 node "$GITHUB_WORKSPACE/server/server.js" >> "$GITHUB_WORKSPACE/ios-report/server.log" 2>&1 &
           echo $! > /tmp/pb-ios-server.pid
           ok=0
-          for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
-            if curl -sf http://127.0.0.1:8799/health >/dev/null; then ok=1; break; fi
+          for i in $(seq 1 30); do
+            if curl --noproxy '*' -sf http://127.0.0.1:8799/health >/dev/null; then ok=1; break; fi
             sleep 1
           done
           if [ "$ok" != 1 ]; then
