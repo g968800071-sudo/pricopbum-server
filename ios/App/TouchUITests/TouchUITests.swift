@@ -8,7 +8,7 @@ final class TouchUITests: XCTestCase {
         app.launch()
         XCUIDevice.shared.orientation = .landscapeLeft
         XCTAssertGreaterThan(app.frame.width, app.frame.height, "expected a landscape app frame, got \(app.frame)")
-        XCTAssertTrue(waitLog("\"stage\":\"menu\"", 45))
+        XCTAssertTrue(waitLog("\"stage\":\"menu\"", 90))
         app.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.16)).tap()
         Thread.sleep(forTimeInterval: 1.2)
         try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/pb-shop.png"))

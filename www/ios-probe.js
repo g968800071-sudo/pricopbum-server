@@ -57,8 +57,13 @@
       window.__pbApp.ui.tourJoin(4);
       for (var a = 0; a < 60 && !(window.__pbTour && window.__pbTour.members && window.__pbTour.members.length === 4); a++) await sleep(300);
       if (window.__pbApp.net.tr) window.__pbApp.net.tr.send({ t: 'tourReady' });
-      for (var b = 0; b < 40 && !(window.__pbTour && (window.__pbTour.phase === 'live' || window.__pbTour.phase === 'done')); b++) await sleep(250);
-      if (window.__pbApp.net.tr) window.__pbApp.net.tr.send({ t: 'tourWatch' });
+      for (var b = 0; b < 80 && !(window.__pbTour && window.__pbTour.phase === 'live'); b++) await sleep(250);
+      for (var wtry = 0; wtry < 40; wtry++) {
+        var sess0 = window.__pbApp.session;
+        if (sess0 && sess0.opts && sess0.opts.watch) break;
+        if (window.__pbApp.net.tr && window.__pbTour && window.__pbTour.phase === 'live') window.__pbApp.net.tr.send({ t: 'tourWatch' });
+        await sleep(300);
+      }
       var x0 = null, moved = false, tanks = 0, watch = false;
       for (var c = 0; c < 40; c++) {
         var sess = window.__pbApp.session;
