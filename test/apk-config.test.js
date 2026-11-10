@@ -49,7 +49,7 @@ test('account linking waits for a compatible welcome and does not copy device co
   assert.doesNotMatch(account, /fetch\('\/api\/capabilities'\)/);
   assert.doesNotMatch(account, /d\.coins = \(msg\.coins/);
   assert.match(account, /Этот сервер старее этой сборки/);
-  assert.match(account, /1\.2\.5/);
+  assert.match(account, /1\.2\.6/);
   assert.match(js, /Сервер \+/);
   assert.match(js, /не зачислено/);
   assert.match(account, /applyLedger\(meta, acc, 'restored'\)/);

@@ -89,7 +89,7 @@ const CORS = { 'access-control-allow-origin': '*', 'access-control-allow-methods
 function sendJson(res, code, obj) { const b = JSON.stringify(obj); res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...CORS }); res.end(b); }
 function getAccountSafe(token) { return getAccount(accounts, token) || { ok: false }; }
 export function serverFeatures() {
-  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGiantAdmit: admitCount('brg'), brGoal: 150, brGoalVerified: false, hostedTournament: true, tourWatch: true, tourSizes: [2, 4, 8], tourPracticeBots: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.2.5' };
+  return { proto: PROTO, accounts: true, payments: false, trenchPlayers: 30, brCap: BR_CAP, brQueueCap: CAP.br, brAdmit: admitCount('br'), brGiantAdmit: admitCount('brg'), brGoal: 150, brGoalVerified: false, hostedTournament: true, tourWatch: true, tourSizes: [2, 4, 8], tourPracticeBots: false, ledger: 'sqlite-file', durable: process.env.ACCOUNT_DURABLE === '1', shell: 'node', build: '1.2.6' };
 }
 function applyAccountTmod(c) {
   if (!c.hello) return;

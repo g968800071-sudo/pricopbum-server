@@ -98,11 +98,15 @@ export class App {
     document.addEventListener('visibilitychange', this.onVis);
     this.startAttract(); try { const q = new URLSearchParams(location.search), rc = q.get('room'); if (rc && /^[A-Za-z0-9]{5}$/.test(rc)) { this.ui.pendingRoom = rc.toUpperCase(); const sv = q.get('srv'); if (sv && /^wss?:\/\/[\w.:\-\/\[\]]+$/.test(sv)) this.ui.pendingSrv = sv; } } catch (e) {}
     if (typeof location !== 'undefined' && /nosplash/.test(location.hash)) this.ui.menu(); else this.ui.studioSplash(() => this.ui.menu());
-    this.last = performance.now(); this.raf = requestAnimationFrame((t) => this.loop(t));
+    // The QA probe must not keep a display-link frame loop running, or XCTest never sees the app go idle and the drag never starts.
+    this._probeLive = typeof window !== 'undefined' && !!window.__pbProbe;
+    this.last = performance.now();
+    if (this._probeLive) this._probeTimer = setTimeout(() => this.loop(performance.now()), 32);
+    else this.raf = requestAnimationFrame((t) => this.loop(t));
     this.debug = { app: this };
     if (typeof window !== 'undefined') window.__pricopbum = this.debugApi();
   }
-  destroy() { if (this._i18nOff) this._i18nOff(); cancelAnimationFrame(this.raf); this.ro.disconnect(); this.input.destroy(); this.audio.stopMusic(); document.removeEventListener('visibilitychange', this.onVis); this.net.disconnect(); this.wrap.remove(); }
+  destroy() { if (this._i18nOff) this._i18nOff(); clearTimeout(this._probeTimer); cancelAnimationFrame(this.raf); this.ro.disconnect(); this.input.destroy(); this.audio.stopMusic(); document.removeEventListener('visibilitychange', this.onVis); this.net.disconnect(); this.wrap.remove(); }
   playerCfg() { const d = this.meta.d, tlv = tankLv((d.tankXp || {})[String(d.model ?? 0)]); const TM = d.tmp || []; return { extraLives: (d.mb && d.mb.lives) || 0, tlv, tfx: tankLvFx(tlv), rank: rankOf(d), rki: rankInfo(d).i, name: d.name, cc: d.cc || ccFromLocale(navigator.language), skin: d.skin, model: d.model ?? 0, tmod: tmodOf(d, d.model ?? 0), build: (d.builds || [])[d.buildSel || 0] || null, loadout: d.loadout || null, ib: itemBonus(d), weapon: (d.mb && d.mb.weapon) || d.weapon, tur: d.turSel ?? null, buy: (d.myth && d.myth.length) || TM.length || (d.mb && (d.mb.lx.length || d.mb.pk.length)) ? { lx: [...mythLids(d), ...TM.filter(x => x.lid != null).map(x => x.lid), ...((d.mb && d.mb.lx) || [])], pk: [...mythPk(d), ...TM.filter(x => x.pk).map(x => x.pk), ...((d.mb && d.mb.pk) || [])] } : null, lv: Object.fromEntries(Object.entries(d.up).map(([k, v]) => [k, Math.min(5, v + ((d.mb && d.mb.up[k]) || 0) + (d.mb && d.mb.kit ? 1 : 0))])), human: true }; }
   applySettings() { const s = this.meta.d.settings; if (!s.q31) { s.q31 = 1; if (s.quality === 1) s.quality = 3; try { this.meta.save(); } catch (e) {} } /* r31: mobile default = auto quality */ if (this.input) this.input.sens = 0.5 + (s.sens ?? 0.5); if (this.hud) this.hud.joyA = 0.25 + 0.75 * (s.joyA ?? 1); this._orK = null; try { this.applyOrient(); } catch (_) {} this.audio.setSfx(s.sfx); this.audio.setMusic(s.music); this.audio.setVolumes(s.musVol ?? 0.8, s.sfxVol ?? 1); this.qAuto = (s.quality ?? 3) === 3; this.renderer.quality = [0.45, 0.75, 1, 1, 1.5][s.quality ?? 3]; this.renderer.ultra = (s.quality ?? 3) === 4; this.renderer.qMax = /iPhone|iPad|Android/i.test(navigator.userAgent) ? 1 : 1.2; /* r25: Ultra preset; Auto picks Medium–High on phones */ this.input.leftHanded = !!s.leftHanded; }
   resumeMusic() { if (this.state === 'game') this.audio.playMusic(this.session && this.session.mode === 'classic' ? 'classic' : 'battle'); else this.audio.playMusic('menu'); }
@@ -352,9 +356,16 @@ export class App {
   }
 
   // ---------- per-frame ----------
+  setProbeLive(on) {
+    this._probeLive = !!on;
+    if (!on) { clearTimeout(this._probeTimer); this._probeTimer = 0; cancelAnimationFrame(this.raf); this.raf = 0; return; }
+    if (!this._probeTimer) { this.last = performance.now(); this.loop(performance.now()); }
+  }
   loop(ts) {
     { const gm = this.state === 'game'; if (this._orG !== gm) { this._orG = gm; this._orK = null; try { this.resize(); } catch (e) {} } }
-    this.raf = requestAnimationFrame((t) => this.loop(t));
+    const probe = typeof window !== 'undefined' && window.__pbProbe;
+    if (probe) { this.raf = 0; if (this._probeLive) this._probeTimer = setTimeout(() => this.loop(performance.now()), 32); else this._probeTimer = 0; }
+    else this.raf = requestAnimationFrame((t) => this.loop(t));
     const dt = Math.min(0.1, Math.max(0, (ts - this.last) / 1000)); this.last = ts; // r29: slow devices keep real-time speed (≤6 sim steps per frame)
     try { if (this.state === 'game' && this.session) this.gameFrame(dt); else this.menuFrame(dt); } catch (e) { console.error(e); if (!this._errShown) { this._errShown = true; } }
   }
@@ -649,7 +660,7 @@ export class App {
     if (mode === 'classic') { this.meta.d.stats.classicBest = Math.max(this.meta.d.stats.classicBest || 0, this.stats.classicLevels); this.meta.save(); }
     const canX2 = !online && this.Ads.canRewarded();
     const st3 = (v, t) => h('div', null, v, h('small', null, t));
-    const ov = this.ui.modal([h('div', { class: 'big-title ' + (win ? '' : 'lose') }, title), h('p', null, sub), h('div', { class: 'stats3' }, st3(this.stats.kills, 'уничтожено'), st3(Math.round(this.stats.damage), 'урон'), st3(fmtT(view.time), 'время')),
+    const ov = this.ui.modal([h('div', { class: 'resbody' }, h('div', { class: 'big-title ' + (win ? '' : 'lose') }, title), h('p', null, sub), h('div', { class: 'stats3' }, st3(this.stats.kills, 'уничтожено'), st3(Math.round(this.stats.damage), 'урон'), st3(fmtT(view.time), 'время')),
       h('div', { class: 'rew' }, online
         ? h('span', null, 'Сервер +', h('b', { id: 'pb-server-reward' }, String(r.serverCoins)), h('small', { id: 'pb-server-total' }, (this.meta.d.serverCoins | 0) ? (' · счёт ' + (this.meta.d.serverCoins | 0)) : ''), h('small', { id: 'pb-device-wallet' }, ' · устройство ' + r.deviceCoins + ' не зачислено'))
         : h('span', null, icon('coin', 26), h('b', { data: { cnt: r.coins } }, '0')), h('span', { style: 'color:#8dffb0' }, '+', h('b', { data: { cnt: r.xp } }, '0'), ' XP')), h('div', { class: 'rankbox', style: 'margin:6px 0' }, h('p', { class: 'note', style: 'color:#ffd23d' }, online ? ('Серверный RP ' + (r.rpD > 0 ? '+' : '') + r.rpD + (r.draw ? ' · ничья' : '') + ' · звание устройства без изменений') : ('★ ' + r.rk1 + ' · Танк ур. ' + r.tl1 + (r.tl1 > r.tl0 ? ' ▲ (+' + (r.tl1 - r.tl0) + ')' : ''))),
@@ -657,12 +668,13 @@ export class App {
         online ? null : h('div', { style: 'font-weight:700;color:' + (r.rpD >= 0 ? '#8dffb0' : '#ff6b6b') }, 'Прогресс звания ' + (r.rpD >= 0 ? '+' : '−') + Math.abs(r.rpD)),
         h('div', { style: 'height:10px;background:#0006;border-radius:5px;overflow:hidden;margin:4px 20px' }, h('div', { style: 'height:100%;width:' + (r.rpct ?? 0) + '%;background:linear-gradient(90deg,#ffb02e,#ffd23d)' })),
         h('small', { class: 'note' }, (r.rpct ?? 0) + '% → ' + (r.rnext || '—'))),
-      crateEl, r.crKept ? h('p', { class: 'note', style: 'color:#8dffb0' }, '🔥 Серия побед: предметы сохранены (' + r.crKept + ')') : null, r.crLost ? h('p', { class: 'note', style: 'color:#ff6b6b' }, '✖ Предметы из ящиков потеряны (' + r.crLost + ')') : null,
+      crateEl, r.crKept ? h('p', { class: 'note', style: 'color:#8dffb0' }, '🔥 Серия побед: предметы сохранены (' + r.crKept + ')') : null, r.crLost ? h('p', { class: 'note', style: 'color:#ff6b6b' }, '✖ Предметы из ящиков потеряны (' + r.crLost + ')') : null),
       h('div', { class: 'btns' }, canX2 ? h('button', { class: 'btn g big', data: { m: 'x2' } }, icon('ad', 20), 'Смотреть рекламу: x2 монеты') : null, h('button', { class: 'btn y big', data: { m: 'again' } }, s.online ? 'Новый матч' : 'Ещё раз'), h('button', { class: 'btn big', data: { m: 'menu' } }, 'В меню'))], (a, b) => {
       if (a === 'x2') { this.Ads.showRewarded('x2_coins').then(ok => { if (ok) { this.meta.addCoins(r.coins); this.audio.play('coin'); this.ui.toast('+' + r.coins + ' монет (x2)', 'coin'); b.remove(); const c = ov.querySelector('[data-cnt="' + r.coins + '"]'); if (c) c.textContent = r.coins * 2; } }); return false; }
       const go = () => { if (a === 'again') { if (s.online && s.requeue) { s.requeue(); this.quitToMenuThen(() => this.net.quickMatch(view.variant || mode)); } else this.startLocal(s.variant || mode); } else this.quitToMenu(); };
       this.Ads.maybeInterstitial('after_match').then(go);
     }, { dismiss: false });
+    ov.classList.add('res');
     // count-up animation
     for (const el of ov.querySelectorAll('[data-cnt]')) { const target = +el.dataset.cnt; const t0 = performance.now(); const tick = () => { const k = Math.min(1, (performance.now() - t0) / 900); el.textContent = Math.round(target * (1 - Math.pow(1 - k, 3))); if (k < 1) requestAnimationFrame(tick); else this.audio.play('coin', 0.6); }; setTimeout(tick, 300); }
     setTimeout(() => { for (const u of r.ups) { this.audio.play('levelup'); this.ui.toast('Новый уровень ' + u.level + '! +' + u.coins + ' монет, +' + u.gems + ' кристаллов', 'star'); } for (const a of r.ach) this.ui.achToast(a); for (const m of r.missionsDone) this.ui.toast('Задание выполнено: ' + m.text, 'check'); }, 1300);

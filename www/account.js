@@ -10,7 +10,7 @@
     if (el) return el;
     el = document.createElement('div');
     el.id = 'pb-build';
-    el.textContent = 'PRICOPBUM ' + (window.__pbBuild || '1.2.5') + ' test';
+    el.textContent = 'PRICOPBUM ' + (window.__pbBuild || '1.2.6') + ' test';
     el.style.cssText = 'position:fixed;left:8px;bottom:6px;z-index:40;font:600 11px system-ui,sans-serif;color:#ffd23d;pointer-events:none;text-shadow:0 1px 2px #000';
     document.body.appendChild(el);
     return el;

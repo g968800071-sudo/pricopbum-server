@@ -228,6 +228,20 @@ table.odds{width:100%;border-collapse:collapse;font-size:12px}table.odds td,tabl
 .pcb .tbuy .modal{width:min(100%,360px);padding:12px 16px}.pcb .tbuy .tbuyimg{width:72px;height:72px;display:block;margin:0 auto}.pcb .tbuy h3{margin:2px 0}.pcb .tbuy .btns{margin-top:10px}
 @media (orientation:landscape) and (max-height:600px){.pcb .scr[data-name=tanks]{display:grid;grid-template-columns:minmax(240px,38%) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);column-gap:12px;overflow:hidden}.pcb .scr[data-name=tanks]>.hdr{grid-column:1/-1}.pcb .scr[data-name=tanks] .tleft{display:flex;flex-direction:column;min-height:0;overflow-y:auto;position:relative;z-index:2;padding-bottom:6px}.pcb .scr[data-name=tanks] .tright{display:flex;flex-direction:column;min-height:0;min-width:0;position:relative;z-index:2}.pcb .scr[data-name=tanks] .tprev{height:96px;flex:none}.pcb .scr[data-name=tanks] .tact .btn.big{min-height:44px;padding:8px 10px;font-size:15px}.pcb .scr[data-name=tanks] .chips{margin:0 0 4px}.pcb .tbuy .modal{display:grid;grid-template-columns:80px 1fr;column-gap:12px;align-items:center;text-align:left;width:min(100%,520px);padding:10px 14px}.pcb .tbuy .tbuyimg{grid-row:1/span 4;width:80px;height:80px}.pcb .tbuy .btns{grid-column:1/-1;flex-direction:row;flex-wrap:wrap}.pcb .tbuy .btns .btn{flex:1 1 140px;min-height:44px}.pcb .tbuy .big-title{font-size:22px!important}}
 .tmrow{display:flex;align-items:center;gap:10px}.tmic{font-size:26px;width:36px;text-align:center}.tmpips{display:flex;gap:4px;margin-top:4px}.tmpips i{width:16px;height:6px;border-radius:3px;background:#3a4250}.tmpips i.on{background:#ffb02e;box-shadow:0 0 6px #ffb02e}
+.pcb.screen-open .pcb-game{visibility:hidden!important;pointer-events:none!important}
+.pcb.screen-open .pcb-ui{z-index:30}
+.pcb .scr[data-name=shop]{background:#0b1018;z-index:12}
+.pcb .scr[data-name=shop]>.menu-bg{background:#0b1018}
+.pcb .scr[data-name=shop]>.hdr{position:sticky;top:0;z-index:8;background:#0b1018;padding:2px 0 8px;margin:0;flex:none}
+.pcb .shop-close-btn{width:auto;min-width:42px;height:42px;padding:0 12px 0 8px;display:flex;align-items:center;gap:4px}
+.pcb .shop-close{font:700 14px system-ui,sans-serif;color:#fff}
+.pcb .scr[data-name=shop] .card{flex-wrap:wrap;align-items:center;overflow:visible}
+.pcb .scr[data-name=shop] .card .btn{flex:1 0 100%;white-space:normal;height:auto;min-height:40px;margin-top:6px;padding:8px 12px;max-width:100%}
+.pcb .ov.res{align-items:stretch;justify-content:flex-start;padding-top:8px;padding-bottom:8px}
+.pcb .ov.res .modal{display:flex;flex-direction:column;max-height:100%;overflow:hidden;width:min(100%,640px)}
+.pcb .ov.res .resbody{overflow-x:hidden;overflow-y:auto;min-height:0;flex:1 1 auto;-webkit-overflow-scrolling:touch}
+.pcb .ov.res .modal>.btns{position:static;flex:none;background:transparent;margin-top:6px;padding-top:0}
+@media (orientation:landscape) and (max-height:520px){.pcb .ov.res{padding-top:4px}.pcb .ov.res .big-title{font-size:22px;margin:0}.pcb .ov.res .modal p{margin:2px 0}.pcb .ov.res .stats3{margin:4px 0}.pcb .ov.res .stats3 div{font-size:16px;padding:4px 2px}.pcb .ov.res .stats3 small{display:block;font-size:11px;line-height:1.2;color:#d5deea}.pcb .ov.res .rew{font-size:15px;margin:2px 0}.pcb .ov.res .rankbox{margin:2px 0!important}.pcb .ov.res .crate{margin:4px 0!important;padding:4px!important}.pcb .ov.res .crate .crbox{font-size:22px!important}.pcb .ov.res .modal>.btns{flex-direction:column;gap:6px}.pcb .ov.res .modal>.btns .btn.big{height:auto;min-height:36px;font-size:14px;width:100%;white-space:normal;line-height:1.25;padding:6px 10px}}
 `;
 
 // r32: portrait phones render the game rotated 90° (class .rot on .pcb) — re-apply every landscape-only rule there too

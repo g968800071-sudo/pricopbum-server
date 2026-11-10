@@ -40,9 +40,13 @@
   async function main() {
     for (var i = 0; i < 50 && !(window.__pbApp && window.__pbMeta); i++) await sleep(200);
     if (!window.__pbApp) return post({ stage: 'no-app' });
-    var saved = window.__pbBootStore && window.__pbBootStore.pricopbum_server;
+    var saved = '';
+    try { saved = (window.__pbDurableGet && window.__pbDurableGet('pricopbum_server')) || ''; } catch (e) {}
+    if (!saved && window.__pbBootStore) saved = window.__pbBootStore.pricopbum_server || '';
     if (saved) {
-      for (var k = 0; k < 40 && !window.__pbMeta.d.onlineAuth; k++) await sleep(300);
+      for (var k = 0; k < 70 && !window.__pbMeta.d.onlineAuth; k++) await sleep(300);
+      if (!window.__pbMeta.d.onlineAuth && window.__pbApp.net) window.__pbApp.net.connect(saved);
+      for (var k2 = 0; k2 < 40 && !window.__pbMeta.d.onlineAuth; k2++) await sleep(300);
       await post({ stage: 'restored', auth: !!window.__pbMeta.d.onlineAuth, coins: window.__pbMeta.d.coins | 0, serverCoins: window.__pbMeta.d.serverCoins | 0 });
       if (!window.__pbMeta.d.onlineAuth) return;
       window.__pbApp.net.connect('ws://127.0.0.1:' + PORT + '/ws');
@@ -85,10 +89,23 @@
     var x0 = me0 ? me0.x : 0, y0 = me0 ? me0.y : 0, fire0 = me0 ? me0.lastFire || 0 : 0;
     touchN.start = touchN.move = touchN.end = 0;
     ptrN.touch = ptrN.mouse = ptrN.other = 0;
+    var fingers = 0;
+    function arm(e) { if (e && e.isTrusted) { fingers++; if (window.__pbApp.setProbeLive) window.__pbApp.setProbeLive(true); } }
+    function lift(e) {
+      if (!e || !e.isTrusted) return;
+      fingers = Math.max(0, fingers - 1);
+      if (fingers) return;
+      setTimeout(function () { if (!fingers && window.__pbApp.setProbeLive) window.__pbApp.setProbeLive(false); }, 800);
+    }
+    window.addEventListener('touchstart', arm, true);
+    window.addEventListener('touchend', lift, true);
+    window.addEventListener('touchcancel', lift, true);
+    if (window.__pbApp.setProbeLive) window.__pbApp.setProbeLive(false);
     await post({ stage: 'ready-touch', tanks: window.__pbApp.session && window.__pbApp.session.view ? window.__pbApp.session.view.tanks.length : 0, coins: Math.round(x0), serverCoins: Math.round(y0), menu: play ? 'play' : 'not-play' });
     var best = { dx: 0, dy: 0, shots: 0 }, both = false, overlap = 0, maxFingers = 0, px = x0, py = y0, pf = fire0;
     window.addEventListener('touchmove', function (e) { if (e && e.isTrusted && e.touches) maxFingers = Math.max(maxFingers, e.touches.length); }, true);
-    for (var w = 0; w < 120; w++) {
+    var until = Date.now() + 90000;
+    while (Date.now() < until) {
       var me = window.__pbApp.session && window.__pbApp.session.view && window.__pbApp.session.view.tanks.find(function (t) { return t.cid === 'me' || t.human; });
       var inp = window.__pbApp.input;
       var moving = !!(inp && Math.hypot(inp.move.x, inp.move.y) > 0.2);
@@ -103,14 +120,19 @@
         if (step > 1.5 && firedNow) overlap++;
         px = me.x; py = me.y; pf = me.lastFire || pf;
       }
+      if ((best.dx > 8 || best.dy > 8) && best.shots > 0 && touchN.move > 0) break;
       await sleep(200);
     }
     if (overlap > 0) both = true;
+    window.removeEventListener('touchstart', arm, true);
+    window.removeEventListener('touchend', lift, true);
+    window.removeEventListener('touchcancel', lift, true);
+    if (window.__pbApp.setProbeLive) window.__pbApp.setProbeLive(true);
     await post({ stage: 'touch', moved: best.dx > 8 || best.dy > 8, tanks: window.__pbApp.session && window.__pbApp.session.view ? window.__pbApp.session.view.tanks.length : 0, coins: touchN.start, serverCoins: touchN.move, watch: best.shots > 0, menu: 'end=' + touchN.end + ' dx=' + Math.round(best.dx) + ' dy=' + Math.round(best.dy) + ' both=' + (both ? 1 : 0) + ' ov=' + overlap + ' fingers=' + maxFingers + ' ptr=' + ptrN.touch + '/' + ptrN.mouse + ' play=' + (play ? 1 : 0) + ' shots=' + best.shots + ' wh=' + window.innerWidth + 'x' + window.innerHeight });
     window.__pbApp.quitToMenu();
-    await sleep(800);
+    await sleep(1000);
     window.__pbApp.net.connect('ws://127.0.0.1:' + PORT + '/ws');
-    for (var q = 0; q < 40 && !window.__pbMeta.d.onlineAuth; q++) await sleep(300);
+    for (var q = 0; q < 100 && !window.__pbMeta.d.onlineAuth; q++) await sleep(300);
     await post({ stage: 'linked', auth: !!window.__pbMeta.d.onlineAuth, coins: window.__pbMeta.d.coins | 0, serverCoins: window.__pbMeta.d.serverCoins | 0 });
   }
   main();

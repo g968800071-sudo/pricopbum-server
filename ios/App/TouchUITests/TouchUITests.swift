@@ -16,9 +16,9 @@ final class TouchUITests: XCTestCase {
         // Documented XCUICoordinate drags. One finger at a time: the public API
         // has no way to hold two independent sticks down together.
         let move = app.coordinate(withNormalizedOffset: CGVector(dx: 0.18, dy: 0.78))
-        move.press(forDuration: 0.3, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.36, dy: 0.42)), withVelocity: .slow, thenHoldForDuration: 1.2)
+        move.press(forDuration: 0.2, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.36, dy: 0.42)), withVelocity: .slow)
         let aim = app.coordinate(withNormalizedOffset: CGVector(dx: 0.82, dy: 0.78))
-        aim.press(forDuration: 0.3, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.62, dy: 0.42)), withVelocity: .slow, thenHoldForDuration: 1.2)
+        aim.press(forDuration: 0.2, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.62, dy: 0.42)), withVelocity: .slow)
         try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/pb-during-touch.png"))
         XCTAssertTrue(waitLog("\"stage\":\"touch\"", 30))
         let line = try touchLine()

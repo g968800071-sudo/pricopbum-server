@@ -61,6 +61,7 @@ export class UI {
   // ---------- infrastructure ----------
   show(name, kids, cls = '') {
     cancelAnimationFrame(this.previewRaf);
+    try { if (this.app && this.app.wrap) this.app.wrap.classList.toggle('screen-open', name !== 'menu'); } catch (e) {}
     const olds = [...this.el.querySelectorAll('.scr:not(.gone)')];
     const s = h('div', { class: 'scr ' + cls, data: { name } }, kids);
     const same = olds.length === 1 && this.screen === name && olds[0].classList.contains('on');
@@ -71,7 +72,7 @@ export class UI {
     for (const old of olds) { old.classList.remove('on'); old.classList.add('gone'); setTimeout(() => old.remove(), 260); }
     this.el.appendChild(s); requestAnimationFrame(() => requestAnimationFrame(() => s.classList.add('on'))); this.screen = name; return s;
   }
-  clear() { cancelAnimationFrame(this.previewRaf); for (const s of this.el.querySelectorAll('.scr')) { s.classList.remove('on'); setTimeout(() => s.remove(), 260); } this.screen = null; }
+  clear() { cancelAnimationFrame(this.previewRaf); try { if (this.app && this.app.wrap) this.app.wrap.classList.remove('screen-open'); } catch (e) {} for (const s of this.el.querySelectorAll('.scr')) { s.classList.remove('on'); setTimeout(() => s.remove(), 260); } this.screen = null; }
   fade(fn) { this.fadeEl.classList.add('on'); setTimeout(() => { fn(); setTimeout(() => this.fadeEl.classList.remove('on'), 30); }, 260); }
   toast(text, ic = 'star') { const t = h('div', { class: 'toast' }, icon(ic, 18), h('span', null, text)); this.toastsEl.appendChild(t); setTimeout(() => t.remove(), 3100); }
   modal(kids, onAct, opts = {}) {
@@ -295,11 +296,13 @@ export class UI {
     const adBtn = this.btn('g', 'adcoins', null, 'Смотреть'); adBtn.disabled = !canAd;
     const dBtn = this.btn('y', 'daily', null, 'Забрать'); dBtn.disabled = !daily;
     const sec = (t, top) => this.note(t, 'margin:' + (top || 10) + 'px 4px 6px');
-    this.show('shop', [h('div', { class: 'menu-bg' }), this.hdr('Магазин', this.curs(false)), h('div', { class: 'scroll' },
+    const close = h('button', { class: 'iconbtn shop-close-btn', data: { a: 'back' }, title: 'Закрыть' }, icon('back'), h('span', { class: 'shop-close' }, 'Закрыть'));
+    this.show('shop', [h('div', { class: 'menu-bg' }), h('div', { class: 'hdr' }, close, h('h2', null, 'Магазин'), this.curs(false)), h('div', { class: 'scroll' },
+      sec('МОНЕТЫ', 4), coinPacks,
       demo ? h('div', { class: 'panel', style: 'margin-bottom:10px;border-color:rgba(255,59,59,.5)' }, h('span', { class: 'demo-tag' }, 'ДЕМО'), ' ', h('span', { class: 'note' }, 'Веб-версия: покупки и реклама имитируются, деньги не списываются. В Android-версии подключаются Google Play Billing и AdMob.')) : null,
-      sec('БЕСПЛАТНО', 4), this.card('', thumb('ad', 32, '#5cc2ff'), '+15 монет', 'За просмотр рекламы' + (canAd ? '' : ' — лимит на сегодня исчерпан'), adBtn),
+      sec('БЕСПЛАТНО'), this.card('', thumb('ad', 32, '#5cc2ff'), '+15 монет', 'За просмотр рекламы' + (canAd ? '' : ' — лимит на сегодня исчерпан'), adBtn),
       this.card('', thumb('gift', 32, '#ffd23d'), 'Ежедневная награда', daily ? 'Доступна!' : 'Возвращайся завтра', dBtn),
-      sec('МОНЕТЫ'), coinPacks, sec('ОСОБОЕ'), special, sec('КРИСТАЛЛЫ'), gemPacks, sec('ОБМЕН'),
+      sec('ОСОБОЕ'), special, sec('КРИСТАЛЛЫ'), gemPacks, sec('ОБМЕН'),
       [[20, 60], [50, 170], [120, 450]].map(([g, c]) => this.card('', thumb('coin', 32), fmtN(c) + ' монет', null, this.btn('y', 'exch', g + ':' + c, icon('gem', 16), g))),
       h('div', { style: 'text-align:center;margin-top:10px' }, this.btn('', 'restore', null, icon('refresh', 16), 'Восстановить покупки')),
       h('p', { class: 'note', style: 'text-align:center;margin-top:10px' }, 'Монеты тратятся в «Арсенале» и гараже. В онлайн-боях действуют «равные условия»: улучшения ограничены 2-м уровнем, запас в бою недоступен.'))]);
