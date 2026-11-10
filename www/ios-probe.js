@@ -3,6 +3,9 @@
 // It never sends an account token.
 (function () {
   if (!window.__pbProbe) return;
+  window.__pbProbeLive = true;
+  var nativeRaf = window.requestAnimationFrame.bind(window);
+  window.requestAnimationFrame = function (cb) { return window.__pbProbeLive ? nativeRaf(cb) : 0; };
   fetch('http://127.0.0.1:8799/probe', { method: 'POST', body: JSON.stringify({ stage: 'boot', build: window.__pbBuild || '' }) }).catch(function () {});
   var PORT = 8799;
   function post(body) {
@@ -104,25 +107,47 @@
     await post({ stage: 'ready-touch', tanks: window.__pbApp.session && window.__pbApp.session.view ? window.__pbApp.session.view.tanks.length : 0, coins: Math.round(x0), serverCoins: Math.round(y0), menu: play ? 'play' : 'not-play' });
     var best = { dx: 0, dy: 0, shots: 0 }, both = false, overlap = 0, maxFingers = 0, px = x0, py = y0, pf = fire0;
     window.addEventListener('touchmove', function (e) { if (e && e.isTrusted && e.touches) maxFingers = Math.max(maxFingers, e.touches.length); }, true);
-    var until = Date.now() + 90000;
-    while (Date.now() < until) {
+    var poll = 0;
+    function sample() {
       var me = window.__pbApp.session && window.__pbApp.session.view && window.__pbApp.session.view.tanks.find(function (t) { return t.cid === 'me' || t.human; });
       var inp = window.__pbApp.input;
       var moving = !!(inp && Math.hypot(inp.move.x, inp.move.y) > 0.2);
       var firing = !!(inp && (inp.fireHeld || (inp.aim && inp.aim.active) || inp.autoFire));
       if (moving && firing) both = true;
-      if (me) {
-        best.dx = Math.max(best.dx, Math.abs(me.x - x0));
-        best.dy = Math.max(best.dy, Math.abs(me.y - y0));
-        var bullets = (window.__pbApp.session.view.bullets || []).length;
-        if ((me.lastFire || 0) > fire0 + 0.05 || bullets > 0) best.shots++;
-        var step = Math.hypot(me.x - px, me.y - py), firedNow = (me.lastFire || 0) > pf + 0.02;
-        if (step > 1.5 && firedNow) overlap++;
-        px = me.x; py = me.y; pf = me.lastFire || pf;
-      }
-      if ((best.dx > 8 || best.dy > 8) && best.shots > 0 && touchN.move > 0) break;
-      await sleep(200);
+      if (!me) return;
+      best.dx = Math.max(best.dx, Math.abs(me.x - x0));
+      best.dy = Math.max(best.dy, Math.abs(me.y - y0));
+      var bullets = (window.__pbApp.session.view.bullets || []).length;
+      if ((me.lastFire || 0) > fire0 + 0.05 || bullets > 0) best.shots++;
+      var step = Math.hypot(me.x - px, me.y - py), firedNow = (me.lastFire || 0) > pf + 0.02;
+      if (step > 1.5 && firedNow) overlap++;
+      px = me.x; py = me.y; pf = me.lastFire || pf;
     }
+    var finishWait = function () {};
+    var origArm = arm, origLift = lift;
+    arm = function (e) { origArm(e); if (e && e.isTrusted && !poll) poll = setInterval(sample, 100); };
+    lift = function (e) {
+      origLift(e);
+      setTimeout(function () {
+        if (fingers) return;
+        sample();
+        if ((best.dx > 8 || best.dy > 8) && best.shots > 0 && touchN.move > 0) finishWait();
+      }, 1000);
+    };
+    window.removeEventListener('touchstart', origArm, true);
+    window.removeEventListener('touchend', origLift, true);
+    window.removeEventListener('touchcancel', origLift, true);
+    window.addEventListener('touchstart', arm, true);
+    window.addEventListener('touchend', lift, true);
+    window.addEventListener('touchcancel', lift, true);
+    // One timer only. A 200ms poll here keeps the web view awake, so XCTest never delivers the drag.
+    await new Promise(function (resolve) {
+      var done = false;
+      finishWait = function () { if (!done) { done = true; resolve(); } };
+      setTimeout(finishWait, 90000);
+    });
+    if (poll) clearInterval(poll);
+    sample();
     if (overlap > 0) both = true;
     window.removeEventListener('touchstart', arm, true);
     window.removeEventListener('touchend', lift, true);

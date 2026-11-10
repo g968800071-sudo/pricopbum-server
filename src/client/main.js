@@ -358,6 +358,7 @@ export class App {
   // ---------- per-frame ----------
   setProbeLive(on) {
     this._probeLive = !!on;
+    try { if (typeof window !== 'undefined') window.__pbProbeLive = !!on; } catch (e) {}
     if (!on) { clearTimeout(this._probeTimer); this._probeTimer = 0; cancelAnimationFrame(this.raf); this.raf = 0; return; }
     if (!this._probeTimer) { this.last = performance.now(); this.loop(performance.now()); }
   }
