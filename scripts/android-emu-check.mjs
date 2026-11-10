@@ -66,6 +66,20 @@ function screencap(name) {
   say(`shot ${name} ${w}x${h} bytes=${buf.length} bright=${bright.toFixed(3)}`);
   return { file, w, h, bright, bytes: buf.length };
 }
+async function captureBright(name, minBright, nudge) {
+  let best = null;
+  for (let i = 0; i < 5; i++) {
+    const shot = screencap(name + (i ? '.try' + i : '') );
+    if (!best || shot.bright > best.bright) best = shot;
+    if (shot.bright >= minBright) break;
+    if (nudge) await nudge();
+    await new Promise(r => setTimeout(r, 700));
+  }
+  const file = path.join(out, name);
+  if (best.file !== file) fs.copyFileSync(best.file, file);
+  say(`kept ${name} bright=${best.bright.toFixed(3)} bytes=${best.bytes}`);
+  return { ...best, file };
+}
 function wmSize() {
   const text = sh(['shell', 'wm', 'size']);
   const over = text.match(/Override size:\s*(\d+)x(\d+)/);
@@ -192,7 +206,7 @@ try {
     return { iw: innerWidth, ih: innerHeight, dpr: devicePixelRatio, title: box(title), close: box(close), price: box(price), game: gcs, ovs: document.querySelectorAll('.ov').length };
   })()`);
   say('shop ' + JSON.stringify(shop));
-  const shopShot = screencap('shop.png');
+  const shopShot = await captureBright('shop.png', 0.01);
   if (!shop.title || !/Магазин/.test(shop.title.text)) problems.push('shop title missing');
   if (!shop.close || !/Закрыть/.test(shop.close.text)) problems.push('shop close missing');
   if (!shop.price || shop.price.b > shop.ih + 1 || shop.price.t < 0) problems.push('coin price not fully on screen');
@@ -274,16 +288,29 @@ try {
     await new Promise(r => setTimeout(r, 250));
   }
   say('draw ' + JSON.stringify(draw));
-  await ev(cdp, `(() => {
-    document.querySelectorAll('.ov,.ov *').forEach(el => { el.style.transition = 'none'; el.style.transform = 'none'; el.style.filter = 'none'; el.style.backdropFilter = 'none'; el.style.webkitBackdropFilter = 'none'; });
+  const parkDraw = () => ev(cdp, `(() => {
     const ov = document.querySelector('.ov.res');
-    if (ov) { ov.style.opacity = '1'; ov.style.background = '#10151d'; }
-    document.querySelectorAll('canvas.pcb-cv').forEach(c => { c.style.display = 'none'; });
-    document.querySelectorAll('.pcb-game').forEach(g => { g.style.visibility = 'hidden'; });
+    if (ov && ov.parentElement !== document.body) document.body.appendChild(ov);
+    if (ov) {
+      ov.style.transition = 'none';
+      ov.style.transform = 'none';
+      ov.style.filter = 'none';
+      ov.style.backdropFilter = 'none';
+      ov.style.webkitBackdropFilter = 'none';
+      ov.style.opacity = '1';
+      ov.style.position = 'fixed';
+      ov.style.inset = '0';
+      ov.style.zIndex = '100';
+      ov.style.background = '#10151d';
+    }
+    document.querySelectorAll('canvas').forEach(c => { c.style.display = 'none'; });
+    document.querySelectorAll('.pcb-game').forEach(g => { g.style.display = 'none'; });
+    document.body.offsetHeight;
     return true;
   })()`);
-  await new Promise(r => setTimeout(r, 400));
-  const drawShot = screencap('draw.png');
+  await parkDraw();
+  await new Promise(r => setTimeout(r, 500));
+  const drawShot = await captureBright('draw.png', 0.01, parkDraw);
   if (!draw) problems.push('draw dialog did not open');
   else {
     if (!/Легендарный ящик/.test(draw.text)) problems.push('legendary crate title missing');
