@@ -109,9 +109,11 @@ jobs:
             echo 'hw.keyboard=yes'
             echo 'hw.ramSize=2048'
           } >> "$CFG"
-          "$SDK/emulator/emulator" -avd pricopbum -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect -accel on -memory 2048 > "$GITHUB_WORKSPACE/android-report/emulator.log" 2>&1 &
+          # The hosted runner exposes /dev/kvm to root only. The emulator user needs access.
+          sudo chmod 666 /dev/kvm
+          "$SDK/emulator/emulator" -avd pricopbum -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics -gpu swiftshader_indirect -accel on -memory 2048 > "$GITHUB_WORKSPACE/android-report/emulator.log" 2>&1 &
           echo $! > /tmp/emulator.pid
-          timeout 180 adb wait-for-device
+          timeout 300 adb wait-for-device
           for i in $(seq 1 60); do
             if [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; then break; fi
             sleep 3
