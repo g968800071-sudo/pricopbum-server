@@ -51,20 +51,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 class PbBridgeViewController: CAPBridgeViewController, WKScriptMessageHandler {
     private var storeInstalled = false
+    private var pluginRegistered = false
     private var reloadedForStore = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        installStore()
-        if !reloadedForStore {
-            reloadedForStore = true
-            webView?.reload()
-        }
+        prepareStore()
     }
 
     override open func capacitorDidLoad() {
         super.capacitorDidLoad()
+        prepareStore()
+    }
+
+    func prepareStore() {
+        if !pluginRegistered, let bridge = self.bridge {
+            bridge.registerPluginInstance(StoreKitPlugin())
+            pluginRegistered = true
+        }
         installStore()
+        if pluginRegistered && !reloadedForStore {
+            reloadedForStore = true
+            webView?.reload()
+        }
     }
 
     func installStore() {
@@ -73,8 +82,12 @@ class PbBridgeViewController: CAPBridgeViewController, WKScriptMessageHandler {
         let raw = UserDefaults.standard.dictionary(forKey: "pbStore") as? [String: String] ?? [:]
         let data = (try? JSONSerialization.data(withJSONObject: raw, options: [])) ?? Data("{}".utf8)
         let json = String(data: data, encoding: .utf8) ?? "{}"
-        let probe = ProcessInfo.processInfo.arguments.contains("-pbProbe")
-        let source = "window.__pbBootStore=\(json);window.__pbProbe=\(probe ? "true" : "false");"
+        let args = ProcessInfo.processInfo.arguments
+        let probe = args.contains("-pbProbe")
+        var scenario = ""
+        if let idx = args.firstIndex(of: "-pbIap"), idx + 1 < args.count { scenario = args[idx + 1] }
+        let scenarioJson = (try? JSONEncoder().encode(scenario)).flatMap { String(data: $0, encoding: .utf8) } ?? "\"\""
+        let source = "window.__pbBootStore=\(json);window.__pbProbe=\(probe ? "true" : "false");window.__pbIapScenario=\(scenarioJson);"
         webView.configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         webView.configuration.userContentController.add(self, name: "pbStore")
     }

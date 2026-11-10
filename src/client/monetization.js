@@ -1,5 +1,6 @@
 import { GEAR, MYTH_GEAR, ROCKETS, fxText } from '../sim/loot.js';
 import { PRICE_TIERS, tierOf } from './catalog.js';
+import { APPLE_PRODUCTS } from '../iap/products.js';
 // window.Ads / window.IAP — demo implementations on the web, native adapters when running inside Capacitor.
 // Native: @capacitor-community/admob (AdMob) and cordova-plugin-purchase (Google Play Billing). IDs below are Google's public TEST ids.
 export const AD_CONFIG = {
@@ -39,6 +40,11 @@ export const PRODUCTS = [
 ];
 
 function isNative() { return typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform(); }
+function storeKit() {
+  const cap = typeof window !== 'undefined' && window.Capacitor;
+  if (!cap || !cap.getPlatform || cap.getPlatform() !== 'ios') return null;
+  return cap.Plugins && cap.Plugins.StoreKit || null;
+}
 
 export function installMonetization(ui, meta) {
   const native = isNative();
@@ -78,10 +84,26 @@ export function installMonetization(ui, meta) {
     demo: !native, products: PRODUCTS, pend: {},
     // catalog items / bundles / boxes (hundreds of them) are bought through a price-tier product; the client grants the item when Play verifies the tier purchase
     // r35: never fail silently — if Google Play is not ready (no store, product not registered yet, no offer) show a sheet with the price and a clear message
-    unavailable(title, price, done) { try { ui.app.audio.play('click'); ui.modal([ui.h('h3', null, title || 'Покупка'), price ? ui.h('div', { class: 'big-title', style: 'font-size:26px' }, price) : null, ui.h('p', null, 'Покупки за деньги скоро будут доступны.'), ui.h('p', { class: 'note' }, BILLING_ENABLED ? 'Оплата через Google Play откроется после выхода игры в Google Play. Покупки за монеты и кристаллы работают уже сейчас.' : 'Покупки за монеты и кристаллы работают уже сейчас.'), ui.confirmBtns(['', 'ok', 'Понятно'])], null); } catch (e) {} if (done) done(false); return false; },
+    unavailable(title, price, done) { const ios = !!storeKit(); try { ui.app.audio.play('click'); ui.modal([ui.h('h3', null, title || 'Покупка'), price ? ui.h('div', { class: 'big-title', style: 'font-size:26px' }, price) : null, ui.h('p', null, ios ? 'App Store не вернул этот товар. Покупка не выполнена.' : 'Покупки за деньги скоро будут доступны.'), ui.h('p', { class: 'note' }, ios ? 'Товар должен быть заведён в App Store Connect с тем же идентификатором.' : (BILLING_ENABLED ? 'Оплата через Google Play откроется после выхода игры в Google Play. Покупки за монеты и кристаллы работают уже сейчас.' : 'Покупки за монеты и кристаллы работают уже сейчас.')), ui.confirmBtns(['', 'ok', 'Понятно'])], null); } catch (e) {} if (done) done(false); return false; },
     offerOf(id) { try { const sp = this.store && this.store.get(id); const o = sp && sp.getOffer && sp.getOffer(); return o && sp.canPurchase !== false ? o : null; } catch (e) { return null; } },
-    async buyTier(priceStr, done, title) { const v = parseFloat(String(priceStr).replace(',', '.')) || 0, id = tierId(tierOf(v)); const o = this.offerOf(id); if (!o) return this.unavailable(title, priceStr, done); this.pend[id] = done; try { const err = await o.order(); if (err) { delete this.pend[id]; done(false); } } catch (e) { delete this.pend[id]; done(false); } },
+    async buyTier(priceStr, done, title) {
+      const v = parseFloat(String(priceStr).replace(',', '.')) || 0, id = tierId(tierOf(v));
+      if (storeKit()) { const ok = await this.purchaseApple(id); if (done) done(ok); return ok; }
+      const o = this.offerOf(id); if (!o) return this.unavailable(title, priceStr, done); this.pend[id] = done; try { const err = await o.order(); if (err) { delete this.pend[id]; done(false); } } catch (e) { delete this.pend[id]; done(false); }
+    },
+    priceOf(p) { const hit = this.loaded && this.loaded[p.id]; return hit && hit.displayPrice ? hit.displayPrice : p.price; },
     async init() {
+      const sk = storeKit();
+      if (sk) {
+        this.sk = sk;
+        try {
+          const res = await sk.load({ ids: APPLE_PRODUCTS.map(p => p.id) });
+          this.loaded = {};
+          for (const row of res.products || []) this.loaded[row.id] = row;
+          this.ready = true;
+        } catch (e) { this.ready = false; console.warn('StoreKit load failed', e); }
+        return;
+      }
       if (!native || !BILLING_ENABLED || !window.CdvPurchase) return;
       try {
         const { store, ProductType, Platform } = window.CdvPurchase; this.store = store;
@@ -97,11 +119,80 @@ export function installMonetization(ui, meta) {
       if (p.gems) meta.addGems(p.gems); if (p.coins) meta.addCoins(p.coins, false); if (p.skin) meta.grantSkin(p.skin);
       if (p.myth) { const L = meta.d.myth || (meta.d.myth = []); if (!L.includes(p.myth)) L.push(p.myth); } if (p.removeAds) meta.d.removeAds = true; if (id === 'starter_pack') meta.d.starter = true; meta.save();
     },
+    applyEntitlement(body) {
+      if (!body || !body.ok) return;
+      if (body.account && window.__pbApplyAcct) window.__pbApplyAcct(meta, body.account);
+      const kept = meta.d.coins | 0;
+      if (body.myth) { const L = meta.d.myth || (meta.d.myth = []); if (!L.includes(body.myth)) L.push(body.myth); }
+      if (body.skin) meta.grantSkin(body.skin);
+      if (body.removeAds) meta.d.removeAds = true;
+      if (body.starter) meta.d.starter = true;
+      if (body.seasonPass) { const bp = meta.d.bp || (meta.d.bp = { xp: 0, fc: [], pc: [], prem: false }); bp.prem = true; }
+      if (!body.replay && body.gems) meta.addGems(body.gems);
+      if ((meta.d.coins | 0) !== kept) meta.d.coins = kept;
+      meta.save();
+    },
+    async submitApple(jws) {
+      const token = window.__pbDurableGet ? window.__pbDurableGet('pricopbum_account') : '';
+      const res = await fetch(window.__pbApi('/api/iap/apple'), { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, jws }) });
+      const body = await res.json();
+      this.applyEntitlement(body);
+      return body;
+    },
+    async purchaseApple(id) {
+      const sk = this.sk || storeKit();
+      const p = PRODUCTS.find(x => x.id === id);
+      if (!sk) return false;
+      if (!this.loaded || !this.loaded[id]) return this.unavailable(p && p.title, p && p.price);
+      this.busy = id;
+      try {
+        const result = await sk.purchase({ productId: id });
+        this.last = result || { status: 'error' };
+        if (!result || result.status === 'cancelled') { try { ui.toast('Покупка отменена', 'coin'); } catch (e) {} return false; }
+        if (result.status === 'pending') { try { ui.toast('Покупка ожидает подтверждения', 'coin'); } catch (e) {} return false; }
+        if (result.status !== 'purchased' || !result.jws) { try { ui.toast('Покупка не выполнена', 'coin'); } catch (e) {} return false; }
+        const grant = await this.submitApple(result.jws);
+        this.last = { ...result, ...grant, status: grant && grant.ok ? 'purchased' : (grant && grant.error) || 'error' };
+        if (!grant || !grant.ok) { try { ui.toast('Чек не принят сервером', 'coin'); } catch (e) {} return false; }
+        if (window.__pbIapScenario !== 'buy') { try { await sk.finish({ transactionId: result.transactionId }); } catch (e) {} }
+        if (grant.coinsAdded) { try { ui.toast('+' + grant.coinsAdded + ' монет на счёте', 'coin'); } catch (e) {} }
+        else if (!grant.replay) { try { ui.toast('Покупка выполнена', 'check'); } catch (e) {} }
+        this.busy = '';
+        try { ui.shop && ui.screen === 'shop' && ui.shop(); } catch (e) {}
+        return !grant.replay;
+      } catch (e) {
+        this.last = { status: 'error' };
+        try { ui.toast('Покупка не выполнена', 'coin'); } catch (err) {}
+        return false;
+      } finally { this.busy = ''; }
+    },
     async purchase(id) {
       const p = PRODUCTS.find(x => x.id === id); if (!p || this.owned(id)) return false;
+      if (storeKit()) return this.purchaseApple(id);
       if (native) { const o = this.offerOf(id); if (!o) return this.unavailable(p.title, p.price); try { const err = await o.order(); return !err; } catch (e) { return false; } } const ok = await new Promise(res => ui.demoPurchase(p, res)); if (ok) this.grant(id); return ok;
     },
-    async restore() { if (this.store) { try { await this.store.restorePurchases(); } catch (e) {} } return true; },
+    async restore() {
+      const sk = this.sk || storeKit();
+      if (sk) {
+        let replay = false;
+        try {
+          const res = await sk.restore();
+          const rows = [...(res.unfinished || []), ...(res.entitlements || [])];
+          for (const row of rows) {
+            if (!row || !row.jws) continue;
+            const grant = await this.submitApple(row.jws);
+            if (grant && grant.replay) replay = true;
+            if (grant && grant.ok && row.transactionId) { try { await sk.finish({ transactionId: row.transactionId }); } catch (e) {} }
+          }
+        } catch (e) { this.last = { status: 'error' }; try { ui.toast('Не удалось восстановить покупки', 'coin'); } catch (err) {} return false; }
+        this.last = { status: 'restored', replay, serverCoins: meta.d.serverCoins | 0 };
+        try { ui.toast(replay ? 'Покупки уже были на счёте' : 'Покупки восстановлены', 'check'); } catch (e) {}
+        try { ui.shop && ui.screen === 'shop' && ui.shop(); } catch (e) {}
+        return true;
+      }
+      if (this.store) { try { await this.store.restorePurchases(); } catch (e) {} }
+      return true;
+    },
   };
   if (native) { const demo = ui.demoPurchase.bind(ui); ui.demoPurchase = (p, done) => (p && p.price ? IAP.buyTier(p.price, done, p.title) : demo(p, done)); } // native: shop items never granted without a real Play purchase
   if (typeof window !== 'undefined') { window.Ads = Ads; window.IAP = IAP; }

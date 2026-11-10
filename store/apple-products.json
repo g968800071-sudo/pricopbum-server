@@ -1,0 +1,677 @@
+[
+  {
+    "id": "coins_500",
+    "kind": "consumable",
+    "coins": 500,
+    "gems": 0,
+    "price": "0.99",
+    "referenceName": "500 coins",
+    "myth": null
+  },
+  {
+    "id": "coins_1400",
+    "kind": "consumable",
+    "coins": 1400,
+    "gems": 0,
+    "price": "2.49",
+    "referenceName": "1400 coins",
+    "myth": null
+  },
+  {
+    "id": "coins_3000",
+    "kind": "consumable",
+    "coins": 3000,
+    "gems": 0,
+    "price": "4.99",
+    "referenceName": "3000 coins",
+    "myth": null
+  },
+  {
+    "id": "coins_6500",
+    "kind": "consumable",
+    "coins": 6500,
+    "gems": 0,
+    "price": "9.99",
+    "referenceName": "6500 coins",
+    "myth": null
+  },
+  {
+    "id": "coins_14000",
+    "kind": "consumable",
+    "coins": 14000,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "14000 coins",
+    "myth": null
+  },
+  {
+    "id": "coins_38000",
+    "kind": "consumable",
+    "coins": 38000,
+    "gems": 0,
+    "price": "49.99",
+    "referenceName": "38000 coins",
+    "myth": null
+  },
+  {
+    "id": "gems_small",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 80,
+    "price": "0.99",
+    "referenceName": "80 gems",
+    "myth": null
+  },
+  {
+    "id": "gems_medium",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 450,
+    "price": "4.99",
+    "referenceName": "450 gems",
+    "myth": null
+  },
+  {
+    "id": "gems_large",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 1200,
+    "price": "9.99",
+    "referenceName": "1200 gems",
+    "myth": null
+  },
+  {
+    "id": "starter_pack",
+    "kind": "non-consumable",
+    "coins": 500,
+    "gems": 50,
+    "price": "1.99",
+    "referenceName": "Starter pack",
+    "myth": null
+  },
+  {
+    "id": "remove_ads",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "2.49",
+    "referenceName": "Remove ads",
+    "myth": null
+  },
+  {
+    "id": "skin_gold",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "1.24",
+    "referenceName": "Gold paint",
+    "myth": null
+  },
+  {
+    "id": "season_pass",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "6.99",
+    "referenceName": "Season pass",
+    "myth": null
+  },
+  {
+    "id": "myth_mgt_48",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic machine gun 48",
+    "myth": "mgt:48"
+  },
+  {
+    "id": "myth_mgt_49",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic machine gun 49",
+    "myth": "mgt:49"
+  },
+  {
+    "id": "myth_tur_48",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic turret 48",
+    "myth": "tur:48"
+  },
+  {
+    "id": "myth_tur_49",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic turret 49",
+    "myth": "tur:49"
+  },
+  {
+    "id": "myth_perk_0",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic perk Swarm",
+    "myth": "mperk:0"
+  },
+  {
+    "id": "myth_perk_1",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic perk Thunder",
+    "myth": "mperk:1"
+  },
+  {
+    "id": "myth_perk_2",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic perk Medic",
+    "myth": "mperk:2"
+  },
+  {
+    "id": "myth_gear_2816",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic part Гусеницы «Титан» · миф",
+    "myth": "gear:2816"
+  },
+  {
+    "id": "myth_gear_2817",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic part Гусеницы «Феникс» · миф",
+    "myth": "gear:2817"
+  },
+  {
+    "id": "myth_gear_2818",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Mythic part Гусеницы «Фантом» · миф",
+    "myth": "gear:2818"
+  },
+  {
+    "id": "myth_gear_2819",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic part Двигатель «Титан» · миф",
+    "myth": "gear:2819"
+  },
+  {
+    "id": "myth_gear_2820",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic part Двигатель «Феникс» · миф",
+    "myth": "gear:2820"
+  },
+  {
+    "id": "myth_gear_2821",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Mythic part Двигатель «Фантом» · миф",
+    "myth": "gear:2821"
+  },
+  {
+    "id": "myth_gear_2822",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic part Бронеплита «Титан» · миф",
+    "myth": "gear:2822"
+  },
+  {
+    "id": "myth_gear_2823",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic part Бронеплита «Феникс» · миф",
+    "myth": "gear:2823"
+  },
+  {
+    "id": "myth_gear_2824",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Mythic part Бронеплита «Фантом» · миф",
+    "myth": "gear:2824"
+  },
+  {
+    "id": "myth_gear_2825",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic part Ствол «Титан» · миф",
+    "myth": "gear:2825"
+  },
+  {
+    "id": "myth_gear_2826",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic part Ствол «Феникс» · миф",
+    "myth": "gear:2826"
+  },
+  {
+    "id": "myth_gear_2827",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Mythic part Ствол «Фантом» · миф",
+    "myth": "gear:2827"
+  },
+  {
+    "id": "myth_gear_2828",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic part Прицел «Титан» · миф",
+    "myth": "gear:2828"
+  },
+  {
+    "id": "myth_gear_2829",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic part Прицел «Феникс» · миф",
+    "myth": "gear:2829"
+  },
+  {
+    "id": "myth_gear_2830",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Mythic part Прицел «Фантом» · миф",
+    "myth": "gear:2830"
+  },
+  {
+    "id": "myth_gear_2831",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic part Подвеска «Титан» · миф",
+    "myth": "gear:2831"
+  },
+  {
+    "id": "myth_gear_2832",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic part Подвеска «Феникс» · миф",
+    "myth": "gear:2832"
+  },
+  {
+    "id": "myth_gear_2833",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Mythic part Подвеска «Фантом» · миф",
+    "myth": "gear:2833"
+  },
+  {
+    "id": "myth_gear_2834",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic part Трансмиссия «Титан» · миф",
+    "myth": "gear:2834"
+  },
+  {
+    "id": "myth_gear_2835",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic part Трансмиссия «Феникс» · миф",
+    "myth": "gear:2835"
+  },
+  {
+    "id": "myth_gear_2836",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Mythic part Трансмиссия «Фантом» · миф",
+    "myth": "gear:2836"
+  },
+  {
+    "id": "myth_gear_2837",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic part Досылатель «Титан» · миф",
+    "myth": "gear:2837"
+  },
+  {
+    "id": "myth_gear_2838",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic part Досылатель «Феникс» · миф",
+    "myth": "gear:2838"
+  },
+  {
+    "id": "myth_gear_2839",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Mythic part Досылатель «Фантом» · миф",
+    "myth": "gear:2839"
+  },
+  {
+    "id": "myth_gear_2840",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic part Экран «Титан» · миф",
+    "myth": "gear:2840"
+  },
+  {
+    "id": "myth_gear_2841",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic part Экран «Феникс» · миф",
+    "myth": "gear:2841"
+  },
+  {
+    "id": "myth_gear_2842",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Mythic part Экран «Фантом» · миф",
+    "myth": "gear:2842"
+  },
+  {
+    "id": "myth_gear_2843",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic part Башенный привод «Титан» · миф",
+    "myth": "gear:2843"
+  },
+  {
+    "id": "myth_gear_2844",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic part Башенный привод «Феникс» · миф",
+    "myth": "gear:2844"
+  },
+  {
+    "id": "myth_gear_2845",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Mythic part Башенный привод «Фантом» · миф",
+    "myth": "gear:2845"
+  },
+  {
+    "id": "myth_gear_2846",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic part Корпус «Титан» · миф",
+    "myth": "gear:2846"
+  },
+  {
+    "id": "myth_gear_2847",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Mythic part Корпус «Феникс» · миф",
+    "myth": "gear:2847"
+  },
+  {
+    "id": "myth_gear_2848",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Mythic part Корпус «Фантом» · миф",
+    "myth": "gear:2848"
+  },
+  {
+    "id": "myth_rocket_49",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic rockets 49",
+    "myth": "rocket:49"
+  },
+  {
+    "id": "myth_rocket_50",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic rockets 50",
+    "myth": "rocket:50"
+  },
+  {
+    "id": "myth_rocket_51",
+    "kind": "non-consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Mythic rockets 51",
+    "myth": "rocket:51"
+  },
+  {
+    "id": "tier_99",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "0.99",
+    "referenceName": "Price tier 0.99",
+    "myth": null
+  },
+  {
+    "id": "tier_199",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "1.99",
+    "referenceName": "Price tier 1.99",
+    "myth": null
+  },
+  {
+    "id": "tier_299",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "2.99",
+    "referenceName": "Price tier 2.99",
+    "myth": null
+  },
+  {
+    "id": "tier_399",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "3.99",
+    "referenceName": "Price tier 3.99",
+    "myth": null
+  },
+  {
+    "id": "tier_499",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "4.99",
+    "referenceName": "Price tier 4.99",
+    "myth": null
+  },
+  {
+    "id": "tier_599",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "5.99",
+    "referenceName": "Price tier 5.99",
+    "myth": null
+  },
+  {
+    "id": "tier_799",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "7.99",
+    "referenceName": "Price tier 7.99",
+    "myth": null
+  },
+  {
+    "id": "tier_999",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "9.99",
+    "referenceName": "Price tier 9.99",
+    "myth": null
+  },
+  {
+    "id": "tier_1299",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "12.99",
+    "referenceName": "Price tier 12.99",
+    "myth": null
+  },
+  {
+    "id": "tier_1499",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "14.99",
+    "referenceName": "Price tier 14.99",
+    "myth": null
+  },
+  {
+    "id": "tier_1999",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "19.99",
+    "referenceName": "Price tier 19.99",
+    "myth": null
+  },
+  {
+    "id": "tier_2499",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "24.99",
+    "referenceName": "Price tier 24.99",
+    "myth": null
+  },
+  {
+    "id": "tier_2999",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "29.99",
+    "referenceName": "Price tier 29.99",
+    "myth": null
+  },
+  {
+    "id": "tier_3999",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "39.99",
+    "referenceName": "Price tier 39.99",
+    "myth": null
+  },
+  {
+    "id": "tier_4999",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "49.99",
+    "referenceName": "Price tier 49.99",
+    "myth": null
+  },
+  {
+    "id": "tier_6999",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "69.99",
+    "referenceName": "Price tier 69.99",
+    "myth": null
+  },
+  {
+    "id": "tier_9999",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "99.99",
+    "referenceName": "Price tier 99.99",
+    "myth": null
+  },
+  {
+    "id": "tier_14999",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "149.99",
+    "referenceName": "Price tier 149.99",
+    "myth": null
+  },
+  {
+    "id": "tier_19999",
+    "kind": "consumable",
+    "coins": 0,
+    "gems": 0,
+    "price": "199.99",
+    "referenceName": "Price tier 199.99",
+    "myth": null
+  }
+]

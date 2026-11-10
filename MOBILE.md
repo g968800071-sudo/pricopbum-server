@@ -45,3 +45,20 @@ open App.xcworkspace
 ```
 
 Then select your Apple Developer team, set a bundle id if you change `studio.pricop.pricopbum`, and archive. Signing certificates stay on that Mac. Do not commit them.
+
+## iOS In-App Purchase
+
+Apple requires StoreKit for coins and other virtual goods. Apple Pay is not used for them. The shop still shows `недоступно` on the web and on Android, because `BILLING_ENABLED` is false and there is no Play Billing session. On iOS the native `StoreKit` plugin loads products from `ios/App/TouchUITests/PRICOPBUM.storekit`, purchases, restores unfinished transactions, and reports cancel. The server grants coins from `src/iap/products.js` only after it checks the signed transaction. The same transaction id does not pay twice. Device coins are not increased. Mythic combat mods still return `payments-off`. `features.payments` stays false; `features.appleIap` is the purchase flag.
+
+The local `.storekit` file is for the simulator. It does not create App Store Connect products and does not charge a card. Xcode receipts are accepted only when the server is started with `IAP_XCODE=1`. Leave that off on any shared or public host. Sandbox and Production receipts must chain to Apple Root CA - G3.
+
+The owner still has to do these steps. This repository does not sign up for the Apple Developer Program, does not sign the app, and does not create the products:
+
+1. Enroll in the Apple Developer Program and accept the Paid Apps agreement, tax, and banking in App Store Connect.
+2. Create the app with bundle id `studio.pricop.pricopbum` if it does not exist.
+3. Turn on the In-App Purchase capability and sign a device build with that team. The simulator build in this repo stays unsigned.
+4. In App Store Connect, create one In-App Purchase for every id in `store/apple-products.json`. Consumable rows are the coin packs, gem packs, and `tier_*` price points. The other rows are non-consumables. Use the `price` column as the price point. `skin_gold` is listed at 1.24 and `season_pass` at 6.99 because those are the local StoreKit prices; Apple's price list may not have 1.24 or 7.00, so pick the nearest price point and keep the product id exact.
+5. Add a sandbox tester only for a real device. The simulator test uses the local `.storekit` file and does not need one.
+6. Ship the signed build. The public server must not set `IAP_XCODE=1`.
+
+Coin packs: `coins_500` (500), `coins_1400` (1400), `coins_3000` (3000), `coins_6500` (6500), `coins_14000` (14000), `coins_38000` (38000). The full id list, including gems, the season pass, mythic items, and the `tier_*` products used by the rest of the shop, is `store/apple-products.json`.
