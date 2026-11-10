@@ -81,15 +81,26 @@ jobs:
           SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
           export ANDROID_SDK_ROOT="$SDK" ANDROID_HOME="$SDK"
           export PATH="$SDK/platform-tools:$SDK/emulator:$SDK/cmdline-tools/latest/bin:$PATH"
-          # The runner image already has the emulator. Reinstalling it failed on a corrupt zip.
-          if [ ! -x "$SDK/emulator/emulator" ]; then
-            "$SDK/cmdline-tools/latest/bin/sdkmanager" "emulator" "platform-tools"
-          fi
+          # The hosted image does not always include a usable emulator binary. A corrupt zip is retried.
+          sdk_get() {
+            local pkg="$1" i
+            for i in 1 2 3; do
+              if "$SDK/cmdline-tools/latest/bin/sdkmanager" "$pkg"; then return 0; fi
+              sleep 5
+            done
+            return 1
+          }
+          if [ ! -x "$SDK/emulator/emulator" ]; then sdk_get "emulator"; sdk_get "platform-tools"; fi
           if [ ! -d "$SDK/system-images/android-35/google_apis/x86_64" ]; then
-            "$SDK/cmdline-tools/latest/bin/sdkmanager" "system-images;android-35;google_apis;x86_64"
+            sdk_get "system-images;android-35;google_apis;x86_64"
           fi
-          echo no | "$SDK/cmdline-tools/latest/bin/avdmanager" create avd -n pricopbum -k "system-images;android-35;google_apis;x86_64" --force
+          mkdir -p "$HOME/.android/avd"
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          "$SDK/cmdline-tools/latest/bin/avdmanager" create avd -n pricopbum -k "system-images;android-35;google_apis;x86_64" --force <<'EOF'
+          no
+          EOF
           CFG="$HOME/.android/avd/pricopbum.avd/config.ini"
+          if [ ! -f "$CFG" ]; then echo 'AVD config was not written'; find "$HOME/.android" -maxdepth 3 -type d | head; exit 1; fi
           {
             echo 'hw.lcd.width=2400'
             echo 'hw.lcd.height=1080'
