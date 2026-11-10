@@ -145,6 +145,14 @@ jobs:
           xc=$?
           set -e
           echo "xcodebuild_exit=$xc" | tee "$GITHUB_WORKSPACE/ios-report/xcodebuild.txt"
+          python3 - << 'PY'
+          import pathlib
+          log = pathlib.Path('/tmp/pb-probe.jsonl')
+          text = log.read_text() if log.exists() else ''
+          for line in text.splitlines():
+              if '"stage":"iap-' in line or '"stage":"touch"' in line:
+                  print(line)
+          PY
           if [ "$xc" != 0 ]; then
             echo "xcodebuild failed: $xc"
             exit "$xc"

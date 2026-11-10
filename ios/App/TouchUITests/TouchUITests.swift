@@ -1,4 +1,3 @@
-import StoreKitTest
 import XCTest
 
 final class TouchUITests: XCTestCase {
@@ -31,24 +30,13 @@ final class TouchUITests: XCTestCase {
     }
 
     func testStoreKitBuyRestoreAndCancel() throws {
-        let session = try SKTestSession(configurationFileNamed: "PRICOPBUM")
-        try session.resetToDefaultState()
-        try session.clearTransactions()
-        session.disableDialogs = true
-        session.locale = Locale(identifier: "en_US")
-        let reset = URL(string: "http://127.0.0.1:8799/api/iap/test-step")!
-        var clear = URLRequest(url: reset)
-        clear.httpMethod = "POST"
-        clear.setValue("application/json", forHTTPHeaderField: "content-type")
-        clear.httpBody = Data("{\"step\":\"\"}".utf8)
-        let cleared = expectation(description: "step reset")
-        URLSession.shared.dataTask(with: clear) { _, _, _ in cleared.fulfill() }.resume()
-        wait(for: [cleared], timeout: 5)
-
         let app = XCUIApplication(bundleIdentifier: "studio.pricop.pricopbum")
         app.launchArguments = ["-pbProbe", "-pbIap", "buy", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        print("iap-launch")
         app.launch()
-        XCTAssertTrue(waitLog("\"stage\":\"iap-buy\"", 45), "purchase did not finish")
+        XCTAssertTrue(waitLog("\"stage\":\"iap-before\"", 50), "purchase setup did not start")
+        XCTAssertTrue(tapSheet(app, ["Purchase", "Buy", "Купить", "500 coins", "0.99", "$0.99", "0,99"]), "purchase sheet did not appear")
+        XCTAssertTrue(waitLog("\"stage\":\"iap-buy\"", 30), "purchase did not finish")
         let before = try probe("iap-before")
         let buy = try probe("iap-buy")
         let beforeServer = num(before["serverCoins"])
@@ -57,26 +45,30 @@ final class TouchUITests: XCTestCase {
         XCTAssertEqual(num(buy["coins"]), num(before["coins"]), "device wallet changed")
         XCTAssertEqual(buy["status"] as? String, "purchased")
 
-        XCTAssertTrue(waitLog("\"stage\":\"iap-restore\"", 20), "restore did not finish")
+        XCTAssertTrue(waitLog("\"stage\":\"iap-restore\"", 25), "restore did not finish")
         let restored = try probe("iap-restore")
         XCTAssertEqual(num(restored["serverCoins"]), boughtServer, "restore credited coins again")
         XCTAssertEqual(restored["replay"] as? Bool, true)
 
-        session.disableDialogs = false
-        var go = URLRequest(url: reset)
-        go.httpMethod = "POST"
-        go.setValue("application/json", forHTTPHeaderField: "content-type")
-        go.httpBody = Data("{\"step\":\"cancel\"}".utf8)
-        let sent = expectation(description: "cancel step")
-        URLSession.shared.dataTask(with: go) { _, _, _ in sent.fulfill() }.resume()
-        wait(for: [sent], timeout: 5)
-        XCTAssertTrue(tapCancel(app), "StoreKit cancel button did not appear")
+        postStep("cancel")
+        XCTAssertTrue(tapSheet(app, ["Cancel", "Отмена", "Annuler", "Abbrechen"]), "StoreKit cancel button did not appear")
         XCTAssertTrue(waitLog("\"stage\":\"iap-cancel\"", 25), "cancel did not finish")
         let cancelled = try probe("iap-cancel")
         XCTAssertEqual(cancelled["status"] as? String, "cancelled", "\(cancelled)")
         XCTAssertEqual(num(cancelled["serverCoins"]), boughtServer)
         XCTAssertEqual(num(cancelled["coins"]), num(before["coins"]))
         try XCUIScreen.main.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/pb-iap-cancel.png"))
+    }
+
+    func postStep(_ step: String) {
+        guard let url = URL(string: "http://127.0.0.1:8799/api/iap/test-step") else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "content-type")
+        req.httpBody = Data("{\"step\":\"\(step)\"}".utf8)
+        let done = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: req) { _, _, _ in done.signal() }.resume()
+        _ = done.wait(timeout: .now() + 5)
     }
 
     func probe(_ stage: String) throws -> [String: Any] {
@@ -93,21 +85,21 @@ final class TouchUITests: XCTestCase {
         return -1
     }
 
-    func tapCancel(_ app: XCUIApplication) -> Bool {
-        let labels = ["Cancel", "Отмена", "Annuler", "Abbrechen", "cancel"]
-        let end = Date().addingTimeInterval(15)
+    func tapSheet(_ app: XCUIApplication, _ labels: [String]) -> Bool {
+        let end = Date().addingTimeInterval(20)
         while Date() < end {
+            let pools = [app.buttons, app.sheets.buttons, app.alerts.buttons]
             for label in labels {
-                let button = app.buttons[label]
-                if button.exists && button.isHittable { button.tap(); return true }
-                let alert = app.alerts.buttons[label]
-                if alert.exists && alert.isHittable { alert.tap(); return true }
+                for pool in pools {
+                    let button = pool[label]
+                    if button.exists && button.isHittable { button.tap(); return true }
+                    let match = pool.matching(NSPredicate(format: "label CONTAINS[c] %@", label)).firstMatch
+                    if match.exists && match.isHittable { match.tap(); return true }
+                }
             }
-            let any = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'cancel' OR label CONTAINS[c] 'отмен'")).firstMatch
-            if any.exists && any.isHittable { any.tap(); return true }
             RunLoop.current.run(until: Date().addingTimeInterval(0.3))
         }
-        let names = app.buttons.allElementsBoundByIndex.prefix(30).map { $0.label }.joined(separator: " | ")
+        let names = app.buttons.allElementsBoundByIndex.prefix(40).map { $0.label }.joined(separator: " | ")
         print("iap-buttons \(names)")
         return false
     }
