@@ -1,0 +1,131 @@
+# Debug APK and an emulator check on a free standard GitHub-hosted Ubuntu runner.
+# ubuntu-latest is the free public-repo pool. This does not use a larger runner,
+# a release keystore, or Play signing.
+name: Android debug emulator
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - cursor/pricopbum-playable-3830
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'www/**'
+      - 'scripts/android-emu-check.mjs'
+      - '.github/workflows/android-emulator.yml'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'capacitor.config.json'
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Smoke
+        run: npm run smoke
+
+      - name: Build the web bundle
+        run: npm run build && npx cap sync android
+
+      - name: Build the debug APK
+        run: |
+          set -euo pipefail
+          if [ -n "${ANDROID_SDK_ROOT:-}" ]; then SDK="$ANDROID_SDK_ROOT";
+          elif [ -n "${ANDROID_HOME:-}" ]; then SDK="$ANDROID_HOME";
+          elif [ -d /usr/local/lib/android/sdk ]; then SDK=/usr/local/lib/android/sdk;
+          else echo 'Android SDK is not on this runner'; exit 1; fi
+          echo "SDK=$SDK"
+          export ANDROID_SDK_ROOT="$SDK" ANDROID_HOME="$SDK"
+          echo "sdk.dir=$SDK" > android/local.properties
+          yes | timeout 90 "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platforms;android-35" "build-tools;35.0.0"
+          cd android && chmod +x ./gradlew && ./gradlew assembleDebug --no-daemon
+          APK="$GITHUB_WORKSPACE/android/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          ls -l "$APK"
+          mkdir -p "$GITHUB_WORKSPACE/android-report"
+          cp "$APK" "$GITHUB_WORKSPACE/android-report/pricopbum-1.2.6-debug.apk"
+          sha256sum "$GITHUB_WORKSPACE/android-report/pricopbum-1.2.6-debug.apk" | tee "$GITHUB_WORKSPACE/android-report/apk.sha256"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pricopbum-android-debug-apk
+          if-no-files-found: warn
+          path: android-report/pricopbum-1.2.6-debug.apk
+
+      - name: Boot an emulator and exercise the APK
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          export ANDROID_SDK_ROOT="$SDK" ANDROID_HOME="$SDK"
+          export PATH="$SDK/platform-tools:$SDK/emulator:$SDK/cmdline-tools/latest/bin:$PATH"
+          # The hosted image does not always include a usable emulator binary. A corrupt zip is retried.
+          sdk_get() {
+            local pkg="$1" i
+            for i in 1 2 3; do
+              if "$SDK/cmdline-tools/latest/bin/sdkmanager" "$pkg"; then return 0; fi
+              sleep 5
+            done
+            return 1
+          }
+          if [ ! -x "$SDK/emulator/emulator" ]; then sdk_get "emulator"; sdk_get "platform-tools"; fi
+          if [ ! -d "$SDK/system-images/android-35/google_apis/x86_64" ]; then
+            sdk_get "system-images;android-35;google_apis;x86_64"
+          fi
+          mkdir -p "$HOME/.android/avd"
+          export ANDROID_AVD_HOME="$HOME/.android/avd"
+          "$SDK/cmdline-tools/latest/bin/avdmanager" create avd -n pricopbum -k "system-images;android-35;google_apis;x86_64" --force <<'EOF'
+          no
+          EOF
+          CFG="$HOME/.android/avd/pricopbum.avd/config.ini"
+          if [ ! -f "$CFG" ]; then echo 'AVD config was not written'; find "$HOME/.android" -maxdepth 3 -type d | head; exit 1; fi
+          {
+            echo 'hw.lcd.width=2400'
+            echo 'hw.lcd.height=1080'
+            echo 'hw.lcd.density=420'
+            echo 'hw.initialOrientation=landscape'
+            echo 'hw.keyboard=yes'
+            echo 'hw.ramSize=2048'
+          } >> "$CFG"
+          # The hosted runner exposes /dev/kvm to root only. The emulator user needs access.
+          sudo chmod 666 /dev/kvm
+          "$SDK/emulator/emulator" -avd pricopbum -no-window -no-audio -no-boot-anim -no-snapshot -no-metrics -gpu swiftshader_indirect -accel on -memory 2048 > "$GITHUB_WORKSPACE/android-report/emulator.log" 2>&1 &
+          echo $! > /tmp/emulator.pid
+          timeout 300 adb wait-for-device
+          for i in $(seq 1 60); do
+            if [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]; then break; fi
+            sleep 3
+          done
+          [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]
+          adb shell input keyevent KEYCODE_WAKEUP || true
+          ANDROID_APK="$GITHUB_WORKSPACE/android-report/pricopbum-1.2.6-debug.apk" ANDROID_REPORT="$GITHUB_WORKSPACE/android-report" node scripts/android-emu-check.mjs
+          kill "$(cat /tmp/emulator.pid)" 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pricopbum-android-emulator-report
+          if-no-files-found: warn
+          path: android-report

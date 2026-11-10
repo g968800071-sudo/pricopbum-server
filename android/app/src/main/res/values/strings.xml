@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">PRICOPBUM</string>
+    <string name="title_activity_main">PRICOPBUM</string>
+    <string name="package_name">studio.pricop.pricopbum</string>
+    <string name="custom_url_scheme">studio.pricop.pricopbum</string>
+</resources>

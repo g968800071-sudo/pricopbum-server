@@ -36,7 +36,7 @@ export const HP_MUL = 2.4;
 export const angDiff = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; };
 
 import { HUNT } from './defs.js';
-const ARMOR_K = 1.25;
+export const ARMOR_K = 1.25; // applied once in makeTank; pickups and respawns must not multiply it again
 import { htUse, htStep, htBullet, htKit } from './htraps.js';
 import { normTmod, applyTmod } from './tmods.js';
 import { addTerrain, hAt, slopeK } from './terrain.js';
@@ -103,7 +103,8 @@ export class World {
   // r22: user rule — on Hard (and above) ~50% of bots spawn with mythic gear (random mix: tank / turret / MG / rockets); Easy/Normal: none
   // r25: persistent tank level (players: from save; bots: rolled by difficulty) → small capped bonus, shown on the plate
   // r37: permanent mods — legendary (coins) / mythic (real money) models only; bots use the bot economy levels passed by the client/server
-  tankMods(t, o) { if (this.mode === 'classic' || !(t.model >= 0)) return; const r = modelOf(t.model).rar; if (r < 3) return; const L = normTmod(o.human ? o.tmod : (r === 4 ? this.opts.botMythMods : this.opts.botMods)); if (L) applyTmod(t, L); }
+  tankMods(t, o) { if (this.mode === 'classic' || !(t.model >= 0)) return; const r = modelOf(t.model).rar; if (r < 3) return; if (r >= 4 && !this.opts.payments) return; // mythic permanent mods are real-money; checkout is not connected, so they are not applied
+    const L = normTmod(o.human ? o.tmod : (r === 4 ? this.opts.botMythMods : this.opts.botMods)); if (L) applyTmod(t, L); }
   tankLvl(t, o) { let lv = o.tlv; if (lv == null) { if (!t.ai || this.opts.equal) return; const d = this.diff ? this.diff.id : 1; let hsh = 7; for (const ch of String(t.name || '')) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0; lv = Math.max(1, Math.min(20, Math.round([2, 5, 9, 13, 17][d] + ((hsh % 1000) / 1000 - 0.5) * 8))); t.prk = 1 + Math.min(18, Math.round(lv * 0.8 + (hsh >> 10) % 4)); if (this.opts.botRk && this.opts.botRk[t.name] != null) t.prk = this.opts.botRk[t.name]; } // r26: persistent bot identity — same nickname ⇒ same tank level & rank every match
     t.tlv = 'Ур.' + lv; if (this.opts.equal || this.mode === 'classic') return; const k = Math.min(19, lv - 1) * 0.005; if (k) this.applyFx(t, { rel: 1 - k, spread: 1 - k, arm: 1 + k }); }
   mythBot(t, o) { if (t.human || !t.ai || (o.etype && /boss/.test(o.etype)) || this.opts.equal) return; const d = this.diff ? this.diff.id : 1, P = [0, 0, 0.5, 0.65, 0.8][d] || 0; /* r25: Hard 50% … hardest 80% */ if (!P || this.rng() >= P) return;
@@ -141,7 +142,8 @@ export class World {
     if (t.spd0 == null) t.spd0 = t.speed / (fx.speed || 1); t.speed = Math.min(t.speed, t.spd0 * 1.3); const cl = (k, lo, hi) => { if (t[k] != null) t[k] = Math.max(lo, Math.min(hi, t[k])); }, cf = (k, lo, hi) => { if (f[k] != null) f[k] = Math.max(lo, Math.min(hi, f[k])); };
     cl('accMul', 0.5, 1.6); cl('relMul', 0.6, 1.5); cl('dmgMul', 0.5, 1.5); cl('armMul', 0.6, 1.4); cl('bulletMul', 0.5, 1.5); cf('spread', 0.35, 2); cf('moveSpread', 0.3, 2); cf('turn', 0.5, 2); cf('splashRes', 0.5, 1); cf('rearArm', 0.5, 1); cf('lootR', 1, 2); cf('ammo', 1, 2); if (f.regen) f.regen = Math.min(f.regen, 2); }
   // r16b: floor loot catalogue pickup
-  takeLX(t, p) { const L = LOOTX[p.lid]; if (!L) return true; const n = p.n || 1;
+  takeLX(t, p) { const L = LOOTX[p.lid]; if (!L) return true; if (t.human && !this.opts.payments && L.r >= 5) return false; // mythic catalogue items are not granted while payment is off
+    const n = p.n || 1;
     switch (L.cat) {
       case 'shell': { if (!t.shA) t.shA = SHELLS.map((S, j) => j ? 0 : -1); if ((t.shA[L.i] || 0) >= SHELL_TYPE_CAP) return false; t.shA[L.i] = Math.min(SHELL_TYPE_CAP, (t.shA[L.i] || 0) + SHELL_PACK); /* r19: one pack = 50 rounds */ if (!t.human && !t.shT) t.shT = L.i; break; }
       case 'rocket': { if (L.i === 0) { if (t.hrockets >= 10) return false; t.hrockets = 10; break; } const A = t.rkA || (t.rkA = ROCKETS.map(() => 0)); const cap = ROCKETS[L.i].hm ? 10 : 4; if (A[L.i] >= cap) return false; A[L.i] = Math.min(cap, (A[L.i] || 0) + (ROCKETS[L.i].hm ? 10 : 2)); if (!t.rkT || !A[t.rkT]) t.rkT = L.i; break; }
@@ -197,7 +199,7 @@ export class World {
   botLv(maxL) { maxL = this.diff.lv; const r = this.rng; return { dmg: r.int(0, maxL), reload: r.int(0, maxL), armor: r.int(0, maxL), engine: r.int(0, maxL) }; }
   initBR() {
     const o = this.opts; this.map = genBR(this.seed, o.mapSize || 340); const m = this.map; if (o.terrain && !o.ffa && !o.cbuild) addTerrain(m, this.seed); // r37: hills & craters only in the big BR
-    const total = o.total || 100, humans = o.players || [];
+    const total = o.total || 150, humans = o.players || [];
     this.zone = { cx: m.pw / 2, cy: m.ph / 2, r: Math.hypot(m.pw, m.ph) / 2 + 40, tcx: m.pw / 2, tcy: m.ph / 2, tr: 0, phase: -1, timer: 0, state: 'wait', dps: 0, sr: 0, scx: 0, scy: 0 };
     this.ffa = !!o.ffa; if (this.ffa) { this.target = o.target || 25; this.timeLimit = o.timeLimit || 300; }
     this.zonePhases = this.ffa ? [] : o.zonePhases || [
