@@ -120,7 +120,7 @@ jobs:
           done
           [ "$(adb shell getprop sys.boot_completed | tr -d '\r')" = "1" ]
           adb shell input keyevent KEYCODE_WAKEUP || true
-          ANDROID_REPORT="$GITHUB_WORKSPACE/android-report" node scripts/android-emu-check.mjs
+          ANDROID_APK="$GITHUB_WORKSPACE/android-report/pricopbum-1.2.6-debug.apk" ANDROID_REPORT="$GITHUB_WORKSPACE/android-report" node scripts/android-emu-check.mjs
           kill "$(cat /tmp/emulator.pid)" 2>/dev/null || true
 
       - uses: actions/upload-artifact@v4

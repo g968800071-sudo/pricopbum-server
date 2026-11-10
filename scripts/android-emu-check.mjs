@@ -79,6 +79,9 @@ async function ev(cdp, expr) {
 
 const problems = [];
 try {
+  const apk = process.env.ANDROID_APK;
+  if (!apk) throw new Error('ANDROID_APK is not set');
+  say(sh(['install', '-r', '-t', apk]).trim());
   sh(['shell', 'input', 'keyevent', 'KEYCODE_WAKEUP']);
   sh(['shell', 'wm', 'dismiss-keyguard']);
   const size = wmSize();
