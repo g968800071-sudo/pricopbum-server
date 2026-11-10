@@ -114,11 +114,12 @@ export function installMonetization(ui, meta) {
         this.loaded = {};
         try {
           const ids = APPLE_PRODUCTS.map(p => p.id);
-          for (let attempt = 0; attempt < 6; attempt++) {
+          for (let attempt = 0; attempt < 8; attempt++) {
             const res = await sk.load({ ids });
-            for (const row of (res && res.products) || []) this.loaded[row.id] = row;
+            this.loadNote = 'req=' + ((res && res.requested) || 0) + ' got=' + ((res && res.products && res.products.length) || 0);
+            for (const row of (res && res.products) || []) if (row && row.id) this.loaded[row.id] = row;
             if (Object.keys(this.loaded).length) break;
-            await new Promise(r => setTimeout(r, 500));
+            await new Promise(r => setTimeout(r, 700));
           }
           this.ready = Object.keys(this.loaded).length > 0;
         } catch (e) { this.ready = false; console.warn('StoreKit load failed', e); }

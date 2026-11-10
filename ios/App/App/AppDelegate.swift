@@ -142,10 +142,10 @@ enum PbIap {
         do {
             switch op {
             case "load":
-                let ids = body["ids"] as? [String] ?? []
+                let ids = (body["ids"] as? [Any] ?? []).compactMap { $0 as? String }
                 let products = try await Product.products(for: Set(ids))
                 let rows: [[String: String]] = products.map { ["id": $0.id, "displayPrice": $0.displayPrice, "displayName": $0.displayName] }
-                return ["products": rows]
+                return ["products": rows, "requested": ids.count]
             case "purchase":
                 let id = body["productId"] as? String ?? ""
                 guard let product = try await Product.products(for: [id]).first else { return ["status": "unavailable"] }
