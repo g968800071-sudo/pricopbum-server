@@ -289,21 +289,16 @@ try {
   }
   say('draw ' + JSON.stringify(draw));
   const parkDraw = () => ev(cdp, `(() => {
+    document.querySelectorAll('.ov.res,.ov.res *').forEach(el => {
+      el.style.transition = 'none';
+      el.style.transform = 'none';
+      el.style.filter = 'none';
+      el.style.backdropFilter = 'none';
+      el.style.webkitBackdropFilter = 'none';
+    });
     const ov = document.querySelector('.ov.res');
-    if (ov && ov.parentElement !== document.body) document.body.appendChild(ov);
-    if (ov) {
-      ov.style.transition = 'none';
-      ov.style.transform = 'none';
-      ov.style.filter = 'none';
-      ov.style.backdropFilter = 'none';
-      ov.style.webkitBackdropFilter = 'none';
-      ov.style.opacity = '1';
-      ov.style.position = 'fixed';
-      ov.style.inset = '0';
-      ov.style.zIndex = '100';
-      ov.style.background = '#10151d';
-    }
-    document.querySelectorAll('.crtxt').forEach(t => { t.style.transition = 'none'; t.style.opacity = '1'; });
+    if (ov) { ov.style.opacity = '1'; ov.style.background = '#10151d'; }
+    document.querySelectorAll('.crtxt').forEach(t => { t.style.opacity = '1'; });
     document.querySelectorAll('canvas').forEach(c => { c.style.display = 'none'; });
     document.querySelectorAll('.pcb-game').forEach(g => { g.style.display = 'none'; });
     document.body.offsetHeight;
@@ -311,7 +306,7 @@ try {
   })()`);
   await parkDraw();
   await new Promise(r => setTimeout(r, 500));
-  const drawShot = await captureBright('draw.png', 0.01, parkDraw);
+  const drawShot = await captureBright('draw.png', 0.05, parkDraw);
   if (!draw) problems.push('draw dialog did not open');
   else {
     if (!/Легендарный ящик/.test(draw.text)) problems.push('legendary crate title missing');
@@ -319,7 +314,7 @@ try {
     if (draw.odds && draw.odds.b > draw.btn.t + 1) problems.push('crate odds sit under the ad button');
   }
   if (drawShot.h < 400) problems.push('draw screenshot is not full height: ' + drawShot.h);
-  if (drawShot.bright < 0.01) problems.push('draw screenshot has no visible UI bright=' + drawShot.bright.toFixed(3));
+  if (drawShot.bright < 0.05) problems.push('draw screenshot has no visible UI bright=' + drawShot.bright.toFixed(3));
   if (shopShot.w !== drawShot.w || shopShot.h !== drawShot.h) problems.push('screenshot sizes differ');
 } catch (err) {
   problems.push(String(err && err.stack || err).slice(0, 800));
