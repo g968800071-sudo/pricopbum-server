@@ -10,6 +10,8 @@ on:
   push:
     branches:
       - cursor/pricopbum-playable-3830
+    paths:
+      - 'ios/**'
 
 jobs:
   simulator:
