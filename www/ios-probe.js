@@ -46,7 +46,10 @@
     for (var k = 0; k < 50 && !window.__pbMeta.d.onlineAuth; k++) await sleep(300);
     if (!window.__pbMeta.d.onlineAuth) return post({ stage: 'iap-no-auth', auth: false, coins: window.__pbMeta.d.coins | 0, serverCoins: window.__pbMeta.d.serverCoins | 0 });
     var beforeCoins = window.__pbMeta.d.coins | 0, beforeServer = window.__pbMeta.d.serverCoins | 0;
-    await post({ stage: 'iap-before', auth: true, coins: beforeCoins, serverCoins: beforeServer });
+    var cap = window.Capacitor;
+    var bridge = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pbIap);
+    var loaded = window.__pbApp.IAP && window.__pbApp.IAP.loaded ? Object.keys(window.__pbApp.IAP.loaded).length : -1;
+    await post({ stage: 'iap-before', auth: true, coins: beforeCoins, serverCoins: beforeServer, menu: 'plat=' + (cap && cap.getPlatform ? cap.getPlatform() : 'none') + ' bridge=' + bridge + ' n=' + loaded + ' ready=' + !!(window.__pbApp.IAP && window.__pbApp.IAP.ready) });
     await window.__pbApp.IAP.purchase('coins_500');
     var bought = window.__pbApp.IAP.last || {};
     await post({ stage: 'iap-buy', auth: true, coins: window.__pbMeta.d.coins | 0, serverCoins: window.__pbMeta.d.serverCoins | 0, status: bought.status || '' });

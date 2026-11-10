@@ -145,6 +145,10 @@ jobs:
           xc=$?
           set -e
           echo "xcodebuild_exit=$xc" | tee "$GITHUB_WORKSPACE/ios-report/xcodebuild.txt"
+          if [ "$xc" != 0 ]; then
+            echo "xcodebuild failed: $xc"
+            exit "$xc"
+          fi
           python3 - << 'PY'
           import pathlib
           log = pathlib.Path('/tmp/pb-probe.jsonl')

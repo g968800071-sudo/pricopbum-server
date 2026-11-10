@@ -11,6 +11,9 @@
     </BuildActionEntries>
   </BuildAction>
   <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES">
+    <StoreKitConfigurationFileReference
+      identifier = "../../../TouchUITests/PRICOPBUM.storekit">
+    </StoreKitConfigurationFileReference>
     <Testables>
       <TestableReference skipped="NO">
         <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A10606AB0000000000000001" BuildableName="TouchUITests.xctest" BlueprintName="TouchUITests" ReferencedContainer="container:App.xcodeproj"/>

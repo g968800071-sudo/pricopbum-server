@@ -40,7 +40,22 @@ export const PRODUCTS = [
 ];
 
 function isNative() { return typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform(); }
+function pbIapBridge() {
+  const handler = window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pbIap;
+  if (!handler) return null;
+  window.__pbIapWait = window.__pbIapWait || {};
+  window.__pbIapSeq = window.__pbIapSeq || 0;
+  window.__pbIapResult = window.__pbIapResult || function (id, body) { const fn = window.__pbIapWait[id]; if (fn) { delete window.__pbIapWait[id]; fn(body || {}); } };
+  const call = (op, extra) => new Promise((resolve) => {
+    const id = 'iap' + (++window.__pbIapSeq);
+    window.__pbIapWait[id] = resolve;
+    try { handler.postMessage(Object.assign({ id, op }, extra || {})); } catch (e) { resolve({ status: 'error' }); }
+  });
+  return { load: (o) => call('load', o), purchase: (o) => call('purchase', o), restore: () => call('restore'), finish: (o) => call('finish', o) };
+}
 function storeKit() {
+  const bridge = typeof window !== 'undefined' ? pbIapBridge() : null;
+  if (bridge) return bridge;
   const cap = typeof window !== 'undefined' && window.Capacitor;
   if (!cap || !cap.getPlatform || cap.getPlatform() !== 'ios') return null;
   return cap.Plugins && cap.Plugins.StoreKit || null;
@@ -96,11 +111,16 @@ export function installMonetization(ui, meta) {
       const sk = storeKit();
       if (sk) {
         this.sk = sk;
+        this.loaded = {};
         try {
-          const res = await sk.load({ ids: APPLE_PRODUCTS.map(p => p.id) });
-          this.loaded = {};
-          for (const row of res.products || []) this.loaded[row.id] = row;
-          this.ready = true;
+          const ids = APPLE_PRODUCTS.map(p => p.id);
+          for (let attempt = 0; attempt < 6; attempt++) {
+            const res = await sk.load({ ids });
+            for (const row of (res && res.products) || []) this.loaded[row.id] = row;
+            if (Object.keys(this.loaded).length) break;
+            await new Promise(r => setTimeout(r, 500));
+          }
+          this.ready = Object.keys(this.loaded).length > 0;
         } catch (e) { this.ready = false; console.warn('StoreKit load failed', e); }
         return;
       }
@@ -142,8 +162,8 @@ export function installMonetization(ui, meta) {
     async purchaseApple(id) {
       const sk = this.sk || storeKit();
       const p = PRODUCTS.find(x => x.id === id);
-      if (!sk) return false;
-      if (!this.loaded || !this.loaded[id]) return this.unavailable(p && p.title, p && p.price);
+      if (!sk) { this.last = { status: 'no-plugin' }; return false; }
+      if (!this.loaded || !this.loaded[id]) { this.last = { status: 'unavailable', ready: !!this.ready, count: this.loaded ? Object.keys(this.loaded).length : 0 }; return this.unavailable(p && p.title, p && p.price); }
       this.busy = id;
       try {
         const result = await sk.purchase({ productId: id });

@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import StoreKit
 import WebKit
 
 @UIApplicationMain
@@ -90,9 +91,11 @@ class PbBridgeViewController: CAPBridgeViewController, WKScriptMessageHandler {
         let source = "window.__pbBootStore=\(json);window.__pbProbe=\(probe ? "true" : "false");window.__pbIapScenario=\(scenarioJson);"
         webView.configuration.userContentController.addUserScript(WKUserScript(source: source, injectionTime: .atDocumentStart, forMainFrameOnly: true))
         webView.configuration.userContentController.add(self, name: "pbStore")
+        webView.configuration.userContentController.add(self, name: "pbIap")
     }
 
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        if message.name == "pbIap" { handleIap(message); return }
         guard message.name == "pbStore" else { return }
         var key = ""
         var value = ""
@@ -104,5 +107,86 @@ class PbBridgeViewController: CAPBridgeViewController, WKScriptMessageHandler {
         var store = UserDefaults.standard.dictionary(forKey: "pbStore") as? [String: String] ?? [:]
         if value.isEmpty { store.removeValue(forKey: key) } else { store[key] = value }
         UserDefaults.standard.set(store, forKey: "pbStore")
+    }
+
+    func replyIap(_ id: String, _ body: [String: Any]) {
+        guard let data = try? JSONSerialization.data(withJSONObject: body, options: []),
+              let json = String(data: data, encoding: .utf8) else { return }
+        let js = "window.__pbIapResult && window.__pbIapResult(" + id.jsonQuoted() + "," + json + ")"
+        webView?.evaluateJavaScript(js, completionHandler: nil)
+    }
+
+    func handleIap(_ message: WKScriptMessage) {
+        let body = message.body as? [String: Any] ?? [:]
+        let id = body["id"] as? String ?? ""
+        let op = body["op"] as? String ?? ""
+        guard #available(iOS 15.0, *) else { replyIap(id, ["status": "unavailable"]); return }
+        Task {
+            let result = await PbIap.run(op, body)
+            await MainActor.run { self.replyIap(id, result) }
+        }
+    }
+}
+
+private extension String {
+    func jsonQuoted() -> String {
+        let data = try? JSONSerialization.data(withJSONObject: [self], options: [])
+        let text = data.flatMap { String(data: $0, encoding: .utf8) } ?? "[\"\"]"
+        return String(text.dropFirst().dropLast())
+    }
+}
+
+@available(iOS 15.0, *)
+enum PbIap {
+    static func run(_ op: String, _ body: [String: Any]) async -> [String: Any] {
+        do {
+            switch op {
+            case "load":
+                let ids = body["ids"] as? [String] ?? []
+                let products = try await Product.products(for: Set(ids))
+                let rows: [[String: String]] = products.map { ["id": $0.id, "displayPrice": $0.displayPrice, "displayName": $0.displayName] }
+                return ["products": rows]
+            case "purchase":
+                let id = body["productId"] as? String ?? ""
+                guard let product = try await Product.products(for: [id]).first else { return ["status": "unavailable"] }
+                let result = try await product.purchase()
+                switch result {
+                case .success(let verification):
+                    guard case .verified(let tx) = verification else { return ["status": "unverified"] }
+                    return ["status": "purchased", "jws": verification.jwsRepresentation, "transactionId": String(tx.id), "productId": tx.productID]
+                case .userCancelled:
+                    return ["status": "cancelled"]
+                case .pending:
+                    return ["status": "pending"]
+                @unknown default:
+                    return ["status": "error"]
+                }
+            case "restore":
+                try? await AppStore.sync()
+                var unfinished: [[String: String]] = []
+                for await result in Transaction.unfinished {
+                    if case .verified(let tx) = result {
+                        unfinished.append(["jws": result.jwsRepresentation, "transactionId": String(tx.id), "productId": tx.productID])
+                    }
+                }
+                var entitlements: [[String: String]] = []
+                for await result in Transaction.currentEntitlements {
+                    if case .verified(let tx) = result {
+                        entitlements.append(["jws": result.jwsRepresentation, "transactionId": String(tx.id), "productId": tx.productID])
+                    }
+                }
+                return ["unfinished": unfinished, "entitlements": entitlements]
+            case "finish":
+                let wanted = body["transactionId"] as? String ?? ""
+                for await result in Transaction.unfinished {
+                    if case .verified(let tx) = result, String(tx.id) == wanted { await tx.finish() }
+                }
+                return ["ok": true]
+            default:
+                return ["status": "error"]
+            }
+        } catch {
+            return ["status": "error", "message": error.localizedDescription]
+        }
     }
 }
