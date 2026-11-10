@@ -81,7 +81,13 @@ jobs:
           SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
           export ANDROID_SDK_ROOT="$SDK" ANDROID_HOME="$SDK"
           export PATH="$SDK/platform-tools:$SDK/emulator:$SDK/cmdline-tools/latest/bin:$PATH"
-          "$SDK/cmdline-tools/latest/bin/sdkmanager" "emulator" "platform-tools" "system-images;android-35;google_apis;x86_64"
+          # The runner image already has the emulator. Reinstalling it failed on a corrupt zip.
+          if [ ! -x "$SDK/emulator/emulator" ]; then
+            "$SDK/cmdline-tools/latest/bin/sdkmanager" "emulator" "platform-tools"
+          fi
+          if [ ! -d "$SDK/system-images/android-35/google_apis/x86_64" ]; then
+            "$SDK/cmdline-tools/latest/bin/sdkmanager" "system-images;android-35;google_apis;x86_64"
+          fi
           echo no | "$SDK/cmdline-tools/latest/bin/avdmanager" create avd -n pricopbum -k "system-images;android-35;google_apis;x86_64" --force
           CFG="$HOME/.android/avd/pricopbum.avd/config.ini"
           {
