@@ -133,16 +133,26 @@ jobs:
           cd "$GITHUB_WORKSPACE/ios/App"
           set +e
           # Reuse the app build so the probe rebuild is incremental. 18 minutes covers that compile plus the gestures, and still dies if a drag waits on an idle app. The step cap above is 30 minutes.
-          perl -e 'alarm 1500; exec @ARGV' xcodebuild test \
-            -workspace App.xcworkspace \
-            -scheme TouchUITests \
-            -destination "id=$UDID" \
-            -derivedDataPath "$GITHUB_WORKSPACE/ios-derived" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM=""
-          xc=$?
+          run_tests() {
+            perl -e 'alarm 900; exec @ARGV' xcodebuild test \
+              -workspace App.xcworkspace \
+              -scheme TouchUITests \
+              -destination "id=$UDID" \
+              -derivedDataPath "$GITHUB_WORKSPACE/ios-derived" \
+              -only-testing:"TouchUITests/TouchUITests/$1" \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              DEVELOPMENT_TEAM=""
+          }
+          run_tests testRealTouchesMoveAndFire
+          touch_xc=$?
+          xcrun simctl terminate "$UDID" studio.pricop.pricopbum || true
+          sleep 2
+          run_tests testStoreKitBuyRestoreAndCancel
+          iap_xc=$?
+          xc=$touch_xc
+          if [ "$xc" = 0 ]; then xc=$iap_xc; fi
           set -e
           echo "xcodebuild_exit=$xc" | tee "$GITHUB_WORKSPACE/ios-report/xcodebuild.txt"
           python3 - << 'PY'
