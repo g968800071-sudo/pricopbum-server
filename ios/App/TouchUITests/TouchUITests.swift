@@ -29,11 +29,21 @@ final class TouchUITests: XCTestCase {
         XCTAssertTrue(line.contains("\"watch\":true"), line)
     }
 
+    func sim(_ args: [String]) {
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+        task.arguments = ["simctl"] + args
+        try? task.run()
+        task.waitUntilExit()
+    }
+
     func testStoreKitBuyRestoreAndCancel() throws {
-        let app = XCUIApplication(bundleIdentifier: "studio.pricop.pricopbum")
-        app.launchArguments = ["-pbProbe", "-pbIap", "buy", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        sim(["terminate", "booted", "studio.pricop.pricopbum"])
+        Thread.sleep(forTimeInterval: 1)
         print("iap-launch")
-        app.launch()
+        sim(["launch", "booted", "studio.pricop.pricopbum", "-pbProbe", "-pbIap", "buy", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"])
+        let app = XCUIApplication(bundleIdentifier: "studio.pricop.pricopbum")
+        app.activate()
         XCTAssertTrue(waitLog("\"stage\":\"iap-before\"", 50), "purchase setup did not start")
         XCTAssertTrue(tapSheet(app, ["Purchase", "Buy", "Купить", "500 coins", "0.99", "$0.99", "0,99"]), "purchase sheet did not appear")
         XCTAssertTrue(waitLog("\"stage\":\"iap-buy\"", 30), "purchase did not finish")
