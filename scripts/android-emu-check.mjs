@@ -303,3 +303,4 @@ if (problems.length) {
   process.exit(1);
 }
 say('ANDROID EMU OK');
+process.exit(0);
