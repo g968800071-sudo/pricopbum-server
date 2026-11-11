@@ -56,6 +56,7 @@
     await window.__pbApp.IAP.restore();
     var restored = window.__pbApp.IAP.last || {};
     await post({ stage: 'iap-restore', auth: true, coins: window.__pbMeta.d.coins | 0, serverCoins: window.__pbMeta.d.serverCoins | 0, status: restored.status || '', replay: !!restored.replay });
+    if (window.__pbApp.IAP.sk && window.__pbApp.IAP.sk.dialogs) await window.__pbApp.IAP.sk.dialogs({ show: true });
     for (var s = 0; s < 80; s++) {
       var step = await fetch('http://127.0.0.1:' + PORT + '/api/iap/test-step').then(function (r) { return r.json(); }).catch(function () { return null; });
       if (step && step.step === 'cancel') break;

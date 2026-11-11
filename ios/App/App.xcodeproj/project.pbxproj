@@ -12,6 +12,7 @@
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC3091FED796500168520 /* StoreKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3091FED796500168521 /* StoreKitPlugin.swift */; };
 		A1B003B01DF11E0000000002 /* PRICOPBUM.storekit in Resources */ = {isa = PBXBuildFile; fileRef = A1F002F11EFEF00000000002 /* PRICOPBUM.storekit */; };
+		A1B004B01DF11E0000000003 /* PRICOPBUM.storekit in Resources */ = {isa = PBXBuildFile; fileRef = A1F002F11EFEF00000000002 /* PRICOPBUM.storekit */; };
 		A1B002B01DF11E0000000001 /* TouchUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F001F11EFEF00000000001 /* TouchUITests.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
@@ -221,6 +222,7 @@
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+				A1B004B01DF11E0000000003 /* PRICOPBUM.storekit in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -439,8 +441,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				FRAMEWORK_SEARCH_PATHS = "$(inherited) $(SDKROOT)/Developer/Library/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = "$(inherited) -framework StoreKitTest";
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = studio.pricop.pricopbum;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -459,8 +463,10 @@
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
+				FRAMEWORK_SEARCH_PATHS = "$(inherited) $(SDKROOT)/Developer/Library/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.0;
+				OTHER_LDFLAGS = "$(inherited) -framework StoreKitTest";
 				PRODUCT_BUNDLE_IDENTIFIER = studio.pricop.pricopbum;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";

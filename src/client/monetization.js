@@ -51,7 +51,7 @@ function pbIapBridge() {
     window.__pbIapWait[id] = resolve;
     try { handler.postMessage(Object.assign({ id, op }, extra || {})); } catch (e) { resolve({ status: 'error' }); }
   });
-  return { load: (o) => call('load', o), purchase: (o) => call('purchase', o), restore: () => call('restore'), finish: (o) => call('finish', o) };
+  return { load: (o) => call('load', o), purchase: (o) => call('purchase', o), restore: () => call('restore'), finish: (o) => call('finish', o), dialogs: (o) => call('dialogs', o) };
 }
 function storeKit() {
   const bridge = typeof window !== 'undefined' ? pbIapBridge() : null;
