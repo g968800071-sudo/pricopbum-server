@@ -147,8 +147,11 @@ enum PbStoreKitTest {
     static var session: SKTestSession?
     static func install() {
         if session != nil { return }
-        session = try? SKTestSession(configurationFileNamed: "PRICOPBUM")
-        session?.disableDialogs = true
+        DispatchQueue.global(qos: .userInitiated).async {
+            let opened = try? SKTestSession(configurationFileNamed: "PRICOPBUM")
+            opened?.disableDialogs = true
+            session = opened
+        }
     }
 }
 #endif

@@ -114,7 +114,7 @@ export function installMonetization(ui, meta) {
         this.loaded = {};
         try {
           const ids = APPLE_PRODUCTS.map(p => p.id);
-          for (let attempt = 0; attempt < 8; attempt++) {
+          for (let attempt = 0; attempt < 20; attempt++) {
             const res = await sk.load({ ids });
             this.loadNote = 'req=' + ((res && res.requested) || 0) + ' got=' + ((res && res.products && res.products.length) || 0);
             for (const row of (res && res.products) || []) if (row && row.id) this.loaded[row.id] = row;
