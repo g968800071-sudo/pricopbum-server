@@ -13,7 +13,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         #if targetEnvironment(simulator)
-        if ProcessInfo.processInfo.arguments.contains("-pbIap") { PbStoreKitTest.install() }
+        if #available(iOS 14.0, *), ProcessInfo.processInfo.arguments.contains("-pbIap") { PbStoreKitTest.install() }
         #endif
         return true
     }
@@ -142,6 +142,7 @@ private extension String {
 }
 
 #if targetEnvironment(simulator)
+@available(iOS 14.0, *)
 enum PbStoreKitTest {
     static var session: SKTestSession?
     static func install() {
@@ -194,7 +195,7 @@ enum PbIap {
                 return ["unfinished": unfinished, "entitlements": entitlements]
             case "dialogs":
                 #if targetEnvironment(simulator)
-                PbStoreKitTest.session?.disableDialogs = (body["show"] as? Bool) != true
+                if #available(iOS 14.0, *) { PbStoreKitTest.session?.disableDialogs = (body["show"] as? Bool) != true }
                 #endif
                 return ["ok": true]
             case "finish":
