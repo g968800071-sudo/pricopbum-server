@@ -34,7 +34,9 @@ final class TouchUITests: XCTestCase {
         app.launchArguments = ["-pbProbe", "-pbIap", "buy", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         print("iap-launch")
         app.launch()
-        XCTAssertTrue(waitLog("\"stage\":\"iap-buy\"", 50), "purchase did not finish")
+        XCTAssertTrue(waitLog("\"stage\":\"iap-before\"", 40), "purchase setup did not start")
+        _ = tapSheet(app, ["Purchase", "Buy", "Купить", "500 coins", "0.99", "$0.99", "0,99"])
+        XCTAssertTrue(waitLog("\"stage\":\"iap-buy\"", 20), "purchase did not finish")
         let before = try probe("iap-before")
         let buy = try probe("iap-buy")
         let beforeServer = num(before["serverCoins"])

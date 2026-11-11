@@ -2,9 +2,6 @@ import UIKit
 import Capacitor
 import StoreKit
 import WebKit
-#if targetEnvironment(simulator)
-import StoreKitTest
-#endif
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -12,9 +9,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        #if targetEnvironment(simulator)
-        if #available(iOS 14.0, *), ProcessInfo.processInfo.arguments.contains("-pbIap") { PbStoreKitTest.install() }
-        #endif
         return true
     }
 
@@ -141,21 +135,6 @@ private extension String {
     }
 }
 
-#if targetEnvironment(simulator)
-@available(iOS 14.0, *)
-enum PbStoreKitTest {
-    static var session: SKTestSession?
-    static func install() {
-        if session != nil { return }
-        DispatchQueue.global(qos: .userInitiated).async {
-            let opened = try? SKTestSession(configurationFileNamed: "PRICOPBUM")
-            opened?.disableDialogs = true
-            session = opened
-        }
-    }
-}
-#endif
-
 @available(iOS 15.0, *)
 enum PbIap {
     static func run(_ op: String, _ body: [String: Any]) async -> [String: Any] {
@@ -196,11 +175,6 @@ enum PbIap {
                     }
                 }
                 return ["unfinished": unfinished, "entitlements": entitlements]
-            case "dialogs":
-                #if targetEnvironment(simulator)
-                if #available(iOS 14.0, *) { PbStoreKitTest.session?.disableDialogs = (body["show"] as? Bool) != true }
-                #endif
-                return ["ok": true]
             case "finish":
                 let wanted = body["transactionId"] as? String ?? ""
                 for await result in Transaction.unfinished {

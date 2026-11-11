@@ -441,10 +441,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
-				FRAMEWORK_SEARCH_PATHS = "$(inherited) $(SDKROOT)/Developer/Library/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.0;
-				OTHER_LDFLAGS = "$(inherited) -framework StoreKitTest";
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = studio.pricop.pricopbum;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -463,10 +461,8 @@
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 13.0;
-				FRAMEWORK_SEARCH_PATHS = "$(inherited) $(SDKROOT)/Developer/Library/Frameworks";
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
 				MARKETING_VERSION = 1.0;
-				OTHER_LDFLAGS = "$(inherited) -framework StoreKitTest";
 				PRODUCT_BUNDLE_IDENTIFIER = studio.pricop.pricopbum;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";

@@ -1,0 +1,27 @@
+{
+  "configurations" : [
+    {
+      "id" : "8C2E6B1A-1111-4222-8333-444455556666",
+      "name" : "Store",
+      "options" : {
+
+      }
+    }
+  ],
+  "defaultOptions" : {
+    "storeKitConfigurationFileReference" : {
+      "identifier" : "TouchUITests/PRICOPBUM.storekit"
+    }
+  },
+  "testTargets" : [
+    {
+      "parallelizable" : false,
+      "target" : {
+        "containerPath" : "container:App.xcodeproj",
+        "identifier" : "A10606AB0000000000000001",
+        "name" : "TouchUITests"
+      }
+    }
+  ],
+  "version" : 1
+}

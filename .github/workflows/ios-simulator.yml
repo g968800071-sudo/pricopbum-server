@@ -137,6 +137,7 @@ jobs:
             perl -e 'alarm 900; exec @ARGV' xcodebuild test \
               -workspace App.xcworkspace \
               -scheme TouchUITests \
+              -testPlan PRICOPBUM \
               -destination "id=$UDID" \
               -derivedDataPath "$GITHUB_WORKSPACE/ios-derived" \
               -only-testing:"TouchUITests/TouchUITests/$1" \
