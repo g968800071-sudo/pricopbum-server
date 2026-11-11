@@ -1,7 +1,7 @@
 // Device-linked account ledger in a local SQLite file (ACCOUNT_DB).
-// Spendable coins, rank and legendary mods come only from matches this process simulated and from spends it approved.
-// A device localStorage snapshot is stored as a note and is never added to that balance. The device copy is not deleted.
-// Mythic / real-money rows are refused.
+// Spendable coins, rank and legendary mods come from matches this process simulated, spends it approved,
+// and App Store transactions it verified. A device localStorage snapshot is stored as a note and is never added to that balance.
+// Mythic combat mods are still refused. An App Store purchase records its own entitlement.
 // On a host with an ephemeral disk this file disappears on restart unless ACCOUNT_DB points at a persistent disk and ACCOUNT_DURABLE=1.
 import fs from 'fs';
 import path from 'path';
@@ -11,6 +11,8 @@ import { MODELS } from '../sim/models.js';
 import { TM_COIN, TM_MAX, TMODS } from '../sim/tmods.js';
 import { matchCoins } from '../sim/progress.js';
 import { rankDelta } from '../sim/rank.js';
+import { productById } from '../iap/products.js';
+import { verifyTransactionJws } from '../iap/verify.js';
 
 export function openStore(file) {
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -36,6 +38,13 @@ export function openStore(file) {
       token TEXT NOT NULL,
       spend_key TEXT NOT NULL,
       PRIMARY KEY (token, spend_key)
+    );
+    CREATE TABLE IF NOT EXISTS iap_tx (
+      transaction_id TEXT PRIMARY KEY,
+      token TEXT NOT NULL,
+      product_id TEXT NOT NULL,
+      coins INTEGER NOT NULL,
+      created INTEGER NOT NULL
     );
   `);
   const cols = db.prepare('PRAGMA table_info(accounts)').all().map(c => c.name);
@@ -150,6 +159,44 @@ export function creditMatch(db, token, matchKey, summary) {
   db.prepare('INSERT INTO credits (token, match_key) VALUES (?, ?)').run(t, key);
   db.prepare('UPDATE accounts SET coins = ?, rp = ?, kills = ?, matches = matches + 1 WHERE token = ?').run(row.coins + coins, rp, kills, t);
   return publicAccount(rowOf(db, t));
+}
+
+function entitlementOf(product) {
+  return {
+    productId: product.id,
+    kind: product.kind,
+    gems: product.gems | 0,
+    myth: product.myth || null,
+    skin: product.skin || null,
+    removeAds: !!product.removeAds,
+    starter: !!product.starter,
+    seasonPass: !!product.seasonPass,
+  };
+}
+
+// Credit a verified App Store transaction once. The coin amount comes from the product catalog.
+export function grantAppleTransaction(db, token, verified, product) {
+  const t = validToken(token);
+  const row = t ? rowOf(db, t) : null;
+  if (!row) return { ok: false, error: 'account' };
+  const existing = db.prepare('SELECT token, product_id, coins FROM iap_tx WHERE transaction_id = ?').get(verified.transactionId);
+  if (existing) {
+    if (existing.token !== t) return { ok: false, error: 'transaction-used' };
+    const prev = productById(existing.product_id) || product;
+    return { ok: true, replay: true, coinsAdded: 0, ...entitlementOf(prev), account: publicAccount(row) };
+  }
+  const coins = Math.max(0, product.coins | 0);
+  db.prepare('INSERT INTO iap_tx (transaction_id, token, product_id, coins, created) VALUES (?, ?, ?, ?, ?)').run(verified.transactionId, t, product.id, coins, Date.now());
+  if (coins) db.prepare('UPDATE accounts SET coins = ? WHERE token = ?').run(row.coins + coins, t);
+  return { ok: true, replay: false, coinsAdded: coins, ...entitlementOf(product), account: publicAccount(rowOf(db, t)) };
+}
+
+export function grantAppleReceipt(db, body, { allowXcode = false } = {}) {
+  const verified = verifyTransactionJws(body && body.jws, { allowXcode });
+  if (!verified.ok) return { ok: false, error: verified.error };
+  const product = productById(verified.productId);
+  if (!product) return { ok: false, error: 'product' };
+  return grantAppleTransaction(db, body.token, verified, product);
 }
 
 export function defaultDbFile() {

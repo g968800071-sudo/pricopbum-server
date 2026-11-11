@@ -40,9 +40,36 @@
     }
     if (window.__pbMeta && window.__pbMeta.d) { window.__pbMeta.d.onboarded = 1; try { window.__pbMeta.save(); } catch (e) {} }
   }
+  async function runIap() {
+    window.__pbSetServer && window.__pbSetServer('http://127.0.0.1:' + PORT);
+    if (window.__pbApp.net) window.__pbApp.net.connect('ws://127.0.0.1:' + PORT + '/ws');
+    for (var k = 0; k < 50 && !window.__pbMeta.d.onlineAuth; k++) await sleep(300);
+    if (!window.__pbMeta.d.onlineAuth) return post({ stage: 'iap-no-auth', auth: false, coins: window.__pbMeta.d.coins | 0, serverCoins: window.__pbMeta.d.serverCoins | 0 });
+    var beforeCoins = window.__pbMeta.d.coins | 0, beforeServer = window.__pbMeta.d.serverCoins | 0;
+    var cap = window.Capacitor;
+    var bridge = !!(window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.pbIap);
+    var loaded = window.__pbApp.IAP && window.__pbApp.IAP.loaded ? Object.keys(window.__pbApp.IAP.loaded).length : -1;
+    await post({ stage: 'iap-before', auth: true, coins: beforeCoins, serverCoins: beforeServer, menu: 'plat=' + (cap && cap.getPlatform ? cap.getPlatform() : 'none') + ' bridge=' + bridge + ' n=' + loaded + ' ' + ((window.__pbApp.IAP && window.__pbApp.IAP.loadNote) || '') });
+    await window.__pbApp.IAP.purchase('coins_500');
+    var bought = window.__pbApp.IAP.last || {};
+    await post({ stage: 'iap-buy', auth: true, coins: window.__pbMeta.d.coins | 0, serverCoins: window.__pbMeta.d.serverCoins | 0, status: bought.status || '' });
+    await window.__pbApp.IAP.restore();
+    var restored = window.__pbApp.IAP.last || {};
+    await post({ stage: 'iap-restore', auth: true, coins: window.__pbMeta.d.coins | 0, serverCoins: window.__pbMeta.d.serverCoins | 0, status: restored.status || '', replay: !!restored.replay });
+    if (window.__pbApp.IAP.sk && window.__pbApp.IAP.sk.dialogs) await window.__pbApp.IAP.sk.dialogs({ show: true });
+    for (var s = 0; s < 80; s++) {
+      var step = await fetch('http://127.0.0.1:' + PORT + '/api/iap/test-step').then(function (r) { return r.json(); }).catch(function () { return null; });
+      if (step && step.step === 'cancel') break;
+      await sleep(250);
+    }
+    await window.__pbApp.IAP.purchase('coins_500');
+    var cancelled = window.__pbApp.IAP.last || {};
+    return post({ stage: 'iap-cancel', auth: true, coins: window.__pbMeta.d.coins | 0, serverCoins: window.__pbMeta.d.serverCoins | 0, status: cancelled.status || '' });
+  }
   async function main() {
     for (var i = 0; i < 50 && !(window.__pbApp && window.__pbMeta); i++) await sleep(200);
     if (!window.__pbApp) return post({ stage: 'no-app' });
+    if (window.__pbIapScenario === 'buy') return runIap();
     var saved = '';
     try { saved = (window.__pbDurableGet && window.__pbDurableGet('pricopbum_server')) || ''; } catch (e) {}
     if (!saved && window.__pbBootStore) saved = window.__pbBootStore.pricopbum_server || '';

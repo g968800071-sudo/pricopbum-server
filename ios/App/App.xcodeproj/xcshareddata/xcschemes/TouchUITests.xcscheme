@@ -11,6 +11,15 @@
     </BuildActionEntries>
   </BuildAction>
   <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES">
+    <TestPlans>
+      <TestPlanReference
+        reference = "container:PRICOPBUM.xctestplan"
+        default = "YES">
+      </TestPlanReference>
+    </TestPlans>
+    <StoreKitConfigurationFileReference
+      identifier = "../../../TouchUITests/PRICOPBUM.storekit">
+    </StoreKitConfigurationFileReference>
     <Testables>
       <TestableReference skipped="NO">
         <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A10606AB0000000000000001" BuildableName="TouchUITests.xctest" BlueprintName="TouchUITests" ReferencedContainer="container:App.xcodeproj"/>
@@ -21,6 +30,9 @@
     <BuildableProductRunnable runnableDebuggingMode="0">
       <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="504EC3031FED79650016851F" BuildableName="App.app" BlueprintName="App" ReferencedContainer="container:App.xcodeproj"/>
     </BuildableProductRunnable>
+    <StoreKitConfigurationFileReference
+      identifier = "../../../TouchUITests/PRICOPBUM.storekit">
+    </StoreKitConfigurationFileReference>
   </LaunchAction>
   <ProfileAction buildConfiguration="Release" shouldUseLaunchSchemeArgsEnv="YES" savedToolIdentifier="" useCustomWorkingDirectory="NO" debugDocumentVersioning="YES">
     <BuildableProductRunnable runnableDebuggingMode="0">

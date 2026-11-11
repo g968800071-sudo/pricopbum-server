@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - cursor/pricopbum-playable-3830
+      - cursor/ios-storekit-3830
     paths:
       - 'ios/**'
 
@@ -26,6 +27,12 @@ jobs:
 
       - name: Install JavaScript dependencies
         run: npm ci
+
+      - name: Test
+        run: npm test
+
+      - name: Smoke
+        run: npm run smoke
 
       - name: Copy the web bundle into the iOS project
         run: npx cap copy ios
@@ -71,7 +78,7 @@ jobs:
             ios-report
 
       - name: Boot a simulator and launch the unsigned app
-        timeout-minutes: 30
+        timeout-minutes: 45
         run: |
           set -euo pipefail
           python3 - << 'PY'
@@ -98,9 +105,9 @@ jobs:
           # First boot can sit in CoreLocation migration for several minutes. Cap it so it cannot wait forever.
           perl -e 'alarm 480; exec @ARGV' xcrun simctl bootstatus "$UDID" -b
           rm -f /tmp/pb-ios-probe.sqlite /tmp/pb-probe.jsonl
-          PB_PROBE=1 PB_PROBE_LOG=/tmp/pb-probe.jsonl PORT=8799 ACCOUNT_DB=/tmp/pb-ios-probe.sqlite QUEUE_SECONDS=120 node server/server.js > "$GITHUB_WORKSPACE/ios-report/server.log" 2>&1 &
+          PB_PROBE=1 IAP_XCODE=1 PB_PROBE_LOG=/tmp/pb-probe.jsonl PORT=8799 ACCOUNT_DB=/tmp/pb-ios-probe.sqlite QUEUE_SECONDS=120 node server/server.js > "$GITHUB_WORKSPACE/ios-report/server.log" 2>&1 &
           echo $! > /tmp/pb-ios-server.pid
-          trap 'cp /tmp/pb-probe.jsonl "$GITHUB_WORKSPACE/ios-report/probe.jsonl" 2>/dev/null || true; mkdir -p "$GITHUB_WORKSPACE/ios-report/shots"; cp /tmp/pb-shop.png /tmp/pb-during-touch.png /tmp/pb-inject.txt "$GITHUB_WORKSPACE/ios-report/shots/" 2>/dev/null || true' EXIT
+          trap 'cp /tmp/pb-probe.jsonl "$GITHUB_WORKSPACE/ios-report/probe.jsonl" 2>/dev/null || true; mkdir -p "$GITHUB_WORKSPACE/ios-report/shots"; cp /tmp/pb-shop.png /tmp/pb-during-touch.png /tmp/pb-iap-cancel.png /tmp/pb-inject.txt "$GITHUB_WORKSPACE/ios-report/shots/" 2>/dev/null || true' EXIT
           ok=0
           for i in $(seq 1 30); do
             if curl --noproxy '*' -sf http://127.0.0.1:8799/health >/dev/null; then ok=1; break; fi
@@ -126,18 +133,41 @@ jobs:
           cd "$GITHUB_WORKSPACE/ios/App"
           set +e
           # Reuse the app build so the probe rebuild is incremental. 18 minutes covers that compile plus the gestures, and still dies if a drag waits on an idle app. The step cap above is 30 minutes.
-          perl -e 'alarm 1080; exec @ARGV' xcodebuild test \
-            -workspace App.xcworkspace \
-            -scheme TouchUITests \
-            -destination "id=$UDID" \
-            -derivedDataPath "$GITHUB_WORKSPACE/ios-derived" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            DEVELOPMENT_TEAM=""
-          xc=$?
+          run_tests() {
+            perl -e 'alarm 900; exec @ARGV' xcodebuild test \
+              -workspace App.xcworkspace \
+              -scheme TouchUITests \
+              -testPlan PRICOPBUM \
+              -destination "id=$UDID" \
+              -derivedDataPath "$GITHUB_WORKSPACE/ios-derived" \
+              -only-testing:"TouchUITests/TouchUITests/$1" \
+              CODE_SIGNING_ALLOWED=NO \
+              CODE_SIGNING_REQUIRED=NO \
+              CODE_SIGN_IDENTITY="" \
+              DEVELOPMENT_TEAM=""
+          }
+          run_tests testRealTouchesMoveAndFire
+          touch_xc=$?
+          xcrun simctl terminate "$UDID" studio.pricop.pricopbum || true
+          sleep 2
+          run_tests testStoreKitBuyRestoreAndCancel
+          iap_xc=$?
+          xc=$touch_xc
+          if [ "$xc" = 0 ]; then xc=$iap_xc; fi
           set -e
           echo "xcodebuild_exit=$xc" | tee "$GITHUB_WORKSPACE/ios-report/xcodebuild.txt"
+          python3 - << 'PY'
+          import pathlib
+          log = pathlib.Path('/tmp/pb-probe.jsonl')
+          text = log.read_text() if log.exists() else ''
+          for line in text.splitlines():
+              if '"stage":"iap-' in line or '"stage":"touch"' in line:
+                  print(line)
+          PY
+          if [ "$xc" != 0 ]; then
+            echo "xcodebuild failed: $xc"
+            exit "$xc"
+          fi
           python3 - << 'PY'
           import pathlib
           log = pathlib.Path('/tmp/pb-probe.jsonl')
@@ -170,7 +200,7 @@ jobs:
           sleep 1
           # The test runs with cwd ios/App. A relative server/server.js from there does not exist and the relaunch never connects.
           cd "$GITHUB_WORKSPACE"
-          PB_PROBE=1 PB_PROBE_LOG=/tmp/pb-probe.jsonl PORT=8799 ACCOUNT_DB=/tmp/pb-ios-probe.sqlite QUEUE_SECONDS=120 node "$GITHUB_WORKSPACE/server/server.js" >> "$GITHUB_WORKSPACE/ios-report/server.log" 2>&1 &
+          PB_PROBE=1 IAP_XCODE=1 PB_PROBE_LOG=/tmp/pb-probe.jsonl PORT=8799 ACCOUNT_DB=/tmp/pb-ios-probe.sqlite QUEUE_SECONDS=120 node "$GITHUB_WORKSPACE/server/server.js" >> "$GITHUB_WORKSPACE/ios-report/server.log" 2>&1 &
           echo $! > /tmp/pb-ios-server.pid
           ok=0
           for i in $(seq 1 30); do

@@ -288,17 +288,19 @@ export class UI {
   // ---------- shop ----------
   shop() {
     const d = this.m.d, IAP = this.app.IAP, demo = IAP.demo;
+    const ios = !!(window.Capacitor && window.Capacitor.getPlatform && window.Capacitor.getPlatform() === 'ios');
     const thumb = (ic, sz, color) => h('div', { style: 'width:48px;display:grid;place-items:center' + (color ? ';color:' + color : '') }, icon(ic, sz));
-    const gemPacks = PRODUCTS.filter(p => p.id.startsWith('gems_')).map(p => this.card('', thumb('gem', 36), [p.title, p.badge ? [' ', h('span', { class: 'demo-tag', style: 'background:#2fbf5a' }, p.badge)] : null], 'Кристаллы — для раскрасок и обмена на монеты', this.btn('b', 'iap', p.id, p.price)));
-    const coinPacks = PRODUCTS.filter(p => p.id.startsWith('coins_')).map(p => this.card('', thumb('coin', 34, '#ffd23d'), [p.title, p.badge ? [' ', h('span', { class: 'demo-tag', style: 'background:#2fbf5a' }, p.badge)] : null], 'Google Play: ' + p.id, this.btn('y', 'iap', p.id, p.price)));
-    const special = PRODUCTS.filter(p => !p.id.startsWith('gems_') && !p.id.startsWith('coins_')).map(p => { const own = IAP.owned(p.id); return this.card(own ? 'eq' : '', thumb(p.id === 'remove_ads' ? 'shield' : p.id === 'starter_pack' ? 'gift' : 'crown', 32, '#ffd23d'), p.title, p.desc || '', own ? this.okBadge() : this.btn('b', 'iap', p.id, p.price)); });
+    const payBtn = (p, cls) => { const b = this.btn(cls, 'iap', p.id, IAP.busy === p.id ? '…' : IAP.priceOf(p)); if (IAP.busy === p.id) b.disabled = true; return b; };
+    const gemPacks = PRODUCTS.filter(p => p.id.startsWith('gems_')).map(p => this.card('', thumb('gem', 36), [p.title, p.badge ? [' ', h('span', { class: 'demo-tag', style: 'background:#2fbf5a' }, p.badge)] : null], 'Кристаллы — для раскрасок и обмена на монеты', payBtn(p, 'b')));
+    const coinPacks = PRODUCTS.filter(p => p.id.startsWith('coins_')).map(p => this.card('', thumb('coin', 34, '#ffd23d'), [p.title, p.badge ? [' ', h('span', { class: 'demo-tag', style: 'background:#2fbf5a' }, p.badge)] : null], (ios ? 'App Store: ' : 'Google Play: ') + p.id, payBtn(p, 'y')));
+    const special = PRODUCTS.filter(p => !p.id.startsWith('gems_') && !p.id.startsWith('coins_')).map(p => { const own = IAP.owned(p.id) || (p.id === 'season_pass' && d.bp && d.bp.prem); return this.card(own ? 'eq' : '', thumb(p.id === 'remove_ads' ? 'shield' : p.id === 'starter_pack' ? 'gift' : 'crown', 32, '#ffd23d'), p.title, p.desc || '', own ? this.okBadge() : payBtn(p, 'b')); });
     const canAd = this.app.Ads.canRewarded(), daily = this.m.dailyStatus().available;
     const adBtn = this.btn('g', 'adcoins', null, 'Смотреть'); adBtn.disabled = !canAd;
     const dBtn = this.btn('y', 'daily', null, 'Забрать'); dBtn.disabled = !daily;
     const sec = (t, top) => this.note(t, 'margin:' + (top || 10) + 'px 4px 6px');
     const close = h('button', { class: 'iconbtn shop-close-btn', data: { a: 'back' }, title: 'Закрыть' }, icon('back'), h('span', { class: 'shop-close' }, 'Закрыть'));
     this.show('shop', [h('div', { class: 'menu-bg' }), h('div', { class: 'hdr' }, close, h('h2', null, 'Магазин'), this.curs(false)), h('div', { class: 'scroll' },
-      sec('МОНЕТЫ', 4), coinPacks,
+      sec('МОНЕТЫ', 4), coinPacks, ios ? this.note('Монеты из App Store зачисляются на серверный счёт, не на кошелёк устройства.', 'margin:0 4px 8px') : null,
       demo ? h('div', { class: 'panel', style: 'margin-bottom:10px;border-color:rgba(255,59,59,.5)' }, h('span', { class: 'demo-tag' }, 'ДЕМО'), ' ', h('span', { class: 'note' }, 'Веб-версия: покупки и реклама имитируются, деньги не списываются. В Android-версии подключаются Google Play Billing и AdMob.')) : null,
       sec('БЕСПЛАТНО'), this.card('', thumb('ad', 32, '#5cc2ff'), '+15 монет', 'За просмотр рекламы' + (canAd ? '' : ' — лимит на сегодня исчерпан'), adBtn),
       this.card('', thumb('gift', 32, '#ffd23d'), 'Ежедневная награда', daily ? 'Доступна!' : 'Возвращайся завтра', dBtn),
