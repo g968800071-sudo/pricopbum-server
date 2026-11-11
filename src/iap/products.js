@@ -47,7 +47,7 @@ export function storeKitConfiguration() {
       displayPrice: p.price,
       familyShareable: false,
       internalID: String(100000 + i),
-      localizations: [{ description: p.description, displayName: p.displayName, locale: 'en_US' }, { description: p.description, displayName: p.displayName, locale: 'ru' }],
+      localizations: [{ description: p.description, displayName: p.displayName, locale: 'en_US' }],
       productID: p.id,
       referenceName: p.referenceName,
       type: p.kind === 'consumable' ? 'Consumable' : 'NonConsumable',

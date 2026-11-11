@@ -11,11 +11,6 @@
           "description": "500 coins for PRICOPBUM",
           "displayName": "500 coins",
           "locale": "en_US"
-        },
-        {
-          "description": "500 coins for PRICOPBUM",
-          "displayName": "500 coins",
-          "locale": "ru"
         }
       ],
       "productID": "coins_500",
@@ -31,11 +26,6 @@
           "description": "1400 coins for PRICOPBUM",
           "displayName": "1400 coins",
           "locale": "en_US"
-        },
-        {
-          "description": "1400 coins for PRICOPBUM",
-          "displayName": "1400 coins",
-          "locale": "ru"
         }
       ],
       "productID": "coins_1400",
@@ -51,11 +41,6 @@
           "description": "3000 coins for PRICOPBUM",
           "displayName": "3000 coins",
           "locale": "en_US"
-        },
-        {
-          "description": "3000 coins for PRICOPBUM",
-          "displayName": "3000 coins",
-          "locale": "ru"
         }
       ],
       "productID": "coins_3000",
@@ -71,11 +56,6 @@
           "description": "6500 coins for PRICOPBUM",
           "displayName": "6500 coins",
           "locale": "en_US"
-        },
-        {
-          "description": "6500 coins for PRICOPBUM",
-          "displayName": "6500 coins",
-          "locale": "ru"
         }
       ],
       "productID": "coins_6500",
@@ -91,11 +71,6 @@
           "description": "14000 coins for PRICOPBUM",
           "displayName": "14000 coins",
           "locale": "en_US"
-        },
-        {
-          "description": "14000 coins for PRICOPBUM",
-          "displayName": "14000 coins",
-          "locale": "ru"
         }
       ],
       "productID": "coins_14000",
@@ -111,11 +86,6 @@
           "description": "38000 coins for PRICOPBUM",
           "displayName": "38000 coins",
           "locale": "en_US"
-        },
-        {
-          "description": "38000 coins for PRICOPBUM",
-          "displayName": "38000 coins",
-          "locale": "ru"
         }
       ],
       "productID": "coins_38000",
@@ -131,11 +101,6 @@
           "description": "80 gems for PRICOPBUM",
           "displayName": "80 gems",
           "locale": "en_US"
-        },
-        {
-          "description": "80 gems for PRICOPBUM",
-          "displayName": "80 gems",
-          "locale": "ru"
         }
       ],
       "productID": "gems_small",
@@ -151,11 +116,6 @@
           "description": "450 gems for PRICOPBUM",
           "displayName": "450 gems",
           "locale": "en_US"
-        },
-        {
-          "description": "450 gems for PRICOPBUM",
-          "displayName": "450 gems",
-          "locale": "ru"
         }
       ],
       "productID": "gems_medium",
@@ -171,11 +131,6 @@
           "description": "1200 gems for PRICOPBUM",
           "displayName": "1200 gems",
           "locale": "en_US"
-        },
-        {
-          "description": "1200 gems for PRICOPBUM",
-          "displayName": "1200 gems",
-          "locale": "ru"
         }
       ],
       "productID": "gems_large",
@@ -191,11 +146,6 @@
           "description": "Starter pack",
           "displayName": "Starter pack",
           "locale": "en_US"
-        },
-        {
-          "description": "Starter pack",
-          "displayName": "Starter pack",
-          "locale": "ru"
         }
       ],
       "productID": "starter_pack",
@@ -211,11 +161,6 @@
           "description": "Remove ads",
           "displayName": "Remove ads",
           "locale": "en_US"
-        },
-        {
-          "description": "Remove ads",
-          "displayName": "Remove ads",
-          "locale": "ru"
         }
       ],
       "productID": "remove_ads",
@@ -231,11 +176,6 @@
           "description": "Gold paint",
           "displayName": "Gold paint",
           "locale": "en_US"
-        },
-        {
-          "description": "Gold paint",
-          "displayName": "Gold paint",
-          "locale": "ru"
         }
       ],
       "productID": "skin_gold",
@@ -251,11 +191,6 @@
           "description": "Season pass",
           "displayName": "Season pass",
           "locale": "en_US"
-        },
-        {
-          "description": "Season pass",
-          "displayName": "Season pass",
-          "locale": "ru"
         }
       ],
       "productID": "season_pass",
@@ -271,11 +206,6 @@
           "description": "Mythic machine gun 48",
           "displayName": "Mythic machine gun 48",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic machine gun 48",
-          "displayName": "Mythic machine gun 48",
-          "locale": "ru"
         }
       ],
       "productID": "myth_mgt_48",
@@ -291,11 +221,6 @@
           "description": "Mythic machine gun 49",
           "displayName": "Mythic machine gun 49",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic machine gun 49",
-          "displayName": "Mythic machine gun 49",
-          "locale": "ru"
         }
       ],
       "productID": "myth_mgt_49",
@@ -311,11 +236,6 @@
           "description": "Mythic turret 48",
           "displayName": "Mythic turret 48",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic turret 48",
-          "displayName": "Mythic turret 48",
-          "locale": "ru"
         }
       ],
       "productID": "myth_tur_48",
@@ -331,11 +251,6 @@
           "description": "Mythic turret 49",
           "displayName": "Mythic turret 49",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic turret 49",
-          "displayName": "Mythic turret 49",
-          "locale": "ru"
         }
       ],
       "productID": "myth_tur_49",
@@ -351,11 +266,6 @@
           "description": "Mythic perk Swarm",
           "displayName": "Mythic perk Swarm",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic perk Swarm",
-          "displayName": "Mythic perk Swarm",
-          "locale": "ru"
         }
       ],
       "productID": "myth_perk_0",
@@ -371,11 +281,6 @@
           "description": "Mythic perk Thunder",
           "displayName": "Mythic perk Thunder",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic perk Thunder",
-          "displayName": "Mythic perk Thunder",
-          "locale": "ru"
         }
       ],
       "productID": "myth_perk_1",
@@ -391,11 +296,6 @@
           "description": "Mythic perk Medic",
           "displayName": "Mythic perk Medic",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic perk Medic",
-          "displayName": "Mythic perk Medic",
-          "locale": "ru"
         }
       ],
       "productID": "myth_perk_2",
@@ -411,11 +311,6 @@
           "description": "Mythic part Гусеницы «Титан» · миф",
           "displayName": "Mythic part Гусеницы «Титан» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Гусеницы «Титан» · миф",
-          "displayName": "Mythic part Гусеницы «Титан» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2816",
@@ -431,11 +326,6 @@
           "description": "Mythic part Гусеницы «Феникс» · миф",
           "displayName": "Mythic part Гусеницы «Феникс» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Гусеницы «Феникс» · миф",
-          "displayName": "Mythic part Гусеницы «Феникс» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2817",
@@ -451,11 +341,6 @@
           "description": "Mythic part Гусеницы «Фантом» · миф",
           "displayName": "Mythic part Гусеницы «Фантом» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Гусеницы «Фантом» · миф",
-          "displayName": "Mythic part Гусеницы «Фантом» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2818",
@@ -471,11 +356,6 @@
           "description": "Mythic part Двигатель «Титан» · миф",
           "displayName": "Mythic part Двигатель «Титан» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Двигатель «Титан» · миф",
-          "displayName": "Mythic part Двигатель «Титан» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2819",
@@ -491,11 +371,6 @@
           "description": "Mythic part Двигатель «Феникс» · миф",
           "displayName": "Mythic part Двигатель «Феникс» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Двигатель «Феникс» · миф",
-          "displayName": "Mythic part Двигатель «Феникс» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2820",
@@ -511,11 +386,6 @@
           "description": "Mythic part Двигатель «Фантом» · миф",
           "displayName": "Mythic part Двигатель «Фантом» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Двигатель «Фантом» · миф",
-          "displayName": "Mythic part Двигатель «Фантом» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2821",
@@ -531,11 +401,6 @@
           "description": "Mythic part Бронеплита «Титан» · миф",
           "displayName": "Mythic part Бронеплита «Титан» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Бронеплита «Титан» · миф",
-          "displayName": "Mythic part Бронеплита «Титан» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2822",
@@ -551,11 +416,6 @@
           "description": "Mythic part Бронеплита «Феникс» · миф",
           "displayName": "Mythic part Бронеплита «Феникс» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Бронеплита «Феникс» · миф",
-          "displayName": "Mythic part Бронеплита «Феникс» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2823",
@@ -571,11 +431,6 @@
           "description": "Mythic part Бронеплита «Фантом» · миф",
           "displayName": "Mythic part Бронеплита «Фантом» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Бронеплита «Фантом» · миф",
-          "displayName": "Mythic part Бронеплита «Фантом» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2824",
@@ -591,11 +446,6 @@
           "description": "Mythic part Ствол «Титан» · миф",
           "displayName": "Mythic part Ствол «Титан» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Ствол «Титан» · миф",
-          "displayName": "Mythic part Ствол «Титан» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2825",
@@ -611,11 +461,6 @@
           "description": "Mythic part Ствол «Феникс» · миф",
           "displayName": "Mythic part Ствол «Феникс» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Ствол «Феникс» · миф",
-          "displayName": "Mythic part Ствол «Феникс» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2826",
@@ -631,11 +476,6 @@
           "description": "Mythic part Ствол «Фантом» · миф",
           "displayName": "Mythic part Ствол «Фантом» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Ствол «Фантом» · миф",
-          "displayName": "Mythic part Ствол «Фантом» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2827",
@@ -651,11 +491,6 @@
           "description": "Mythic part Прицел «Титан» · миф",
           "displayName": "Mythic part Прицел «Титан» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Прицел «Титан» · миф",
-          "displayName": "Mythic part Прицел «Титан» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2828",
@@ -671,11 +506,6 @@
           "description": "Mythic part Прицел «Феникс» · миф",
           "displayName": "Mythic part Прицел «Феникс» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Прицел «Феникс» · миф",
-          "displayName": "Mythic part Прицел «Феникс» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2829",
@@ -691,11 +521,6 @@
           "description": "Mythic part Прицел «Фантом» · миф",
           "displayName": "Mythic part Прицел «Фантом» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Прицел «Фантом» · миф",
-          "displayName": "Mythic part Прицел «Фантом» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2830",
@@ -711,11 +536,6 @@
           "description": "Mythic part Подвеска «Титан» · миф",
           "displayName": "Mythic part Подвеска «Титан» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Подвеска «Титан» · миф",
-          "displayName": "Mythic part Подвеска «Титан» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2831",
@@ -731,11 +551,6 @@
           "description": "Mythic part Подвеска «Феникс» · миф",
           "displayName": "Mythic part Подвеска «Феникс» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Подвеска «Феникс» · миф",
-          "displayName": "Mythic part Подвеска «Феникс» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2832",
@@ -751,11 +566,6 @@
           "description": "Mythic part Подвеска «Фантом» · миф",
           "displayName": "Mythic part Подвеска «Фантом» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Подвеска «Фантом» · миф",
-          "displayName": "Mythic part Подвеска «Фантом» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2833",
@@ -771,11 +581,6 @@
           "description": "Mythic part Трансмиссия «Титан» · миф",
           "displayName": "Mythic part Трансмиссия «Титан» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Трансмиссия «Титан» · миф",
-          "displayName": "Mythic part Трансмиссия «Титан» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2834",
@@ -791,11 +596,6 @@
           "description": "Mythic part Трансмиссия «Феникс» · миф",
           "displayName": "Mythic part Трансмиссия «Феникс» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Трансмиссия «Феникс» · миф",
-          "displayName": "Mythic part Трансмиссия «Феникс» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2835",
@@ -811,11 +611,6 @@
           "description": "Mythic part Трансмиссия «Фантом» · миф",
           "displayName": "Mythic part Трансмиссия «Фантом» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Трансмиссия «Фантом» · миф",
-          "displayName": "Mythic part Трансмиссия «Фантом» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2836",
@@ -831,11 +626,6 @@
           "description": "Mythic part Досылатель «Титан» · миф",
           "displayName": "Mythic part Досылатель «Титан» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Досылатель «Титан» · миф",
-          "displayName": "Mythic part Досылатель «Титан» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2837",
@@ -851,11 +641,6 @@
           "description": "Mythic part Досылатель «Феникс» · миф",
           "displayName": "Mythic part Досылатель «Феникс» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Досылатель «Феникс» · миф",
-          "displayName": "Mythic part Досылатель «Феникс» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2838",
@@ -871,11 +656,6 @@
           "description": "Mythic part Досылатель «Фантом» · миф",
           "displayName": "Mythic part Досылатель «Фантом» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Досылатель «Фантом» · миф",
-          "displayName": "Mythic part Досылатель «Фантом» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2839",
@@ -891,11 +671,6 @@
           "description": "Mythic part Экран «Титан» · миф",
           "displayName": "Mythic part Экран «Титан» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Экран «Титан» · миф",
-          "displayName": "Mythic part Экран «Титан» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2840",
@@ -911,11 +686,6 @@
           "description": "Mythic part Экран «Феникс» · миф",
           "displayName": "Mythic part Экран «Феникс» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Экран «Феникс» · миф",
-          "displayName": "Mythic part Экран «Феникс» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2841",
@@ -931,11 +701,6 @@
           "description": "Mythic part Экран «Фантом» · миф",
           "displayName": "Mythic part Экран «Фантом» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Экран «Фантом» · миф",
-          "displayName": "Mythic part Экран «Фантом» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2842",
@@ -951,11 +716,6 @@
           "description": "Mythic part Башенный привод «Титан» · миф",
           "displayName": "Mythic part Башенный привод «Титан» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Башенный привод «Титан» · миф",
-          "displayName": "Mythic part Башенный привод «Титан» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2843",
@@ -971,11 +731,6 @@
           "description": "Mythic part Башенный привод «Феникс» · миф",
           "displayName": "Mythic part Башенный привод «Феникс» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Башенный привод «Феникс» · миф",
-          "displayName": "Mythic part Башенный привод «Феникс» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2844",
@@ -991,11 +746,6 @@
           "description": "Mythic part Башенный привод «Фантом» · миф",
           "displayName": "Mythic part Башенный привод «Фантом» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Башенный привод «Фантом» · миф",
-          "displayName": "Mythic part Башенный привод «Фантом» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2845",
@@ -1011,11 +761,6 @@
           "description": "Mythic part Корпус «Титан» · миф",
           "displayName": "Mythic part Корпус «Титан» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Корпус «Титан» · миф",
-          "displayName": "Mythic part Корпус «Титан» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2846",
@@ -1031,11 +776,6 @@
           "description": "Mythic part Корпус «Феникс» · миф",
           "displayName": "Mythic part Корпус «Феникс» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Корпус «Феникс» · миф",
-          "displayName": "Mythic part Корпус «Феникс» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2847",
@@ -1051,11 +791,6 @@
           "description": "Mythic part Корпус «Фантом» · миф",
           "displayName": "Mythic part Корпус «Фантом» · миф",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic part Корпус «Фантом» · миф",
-          "displayName": "Mythic part Корпус «Фантом» · миф",
-          "locale": "ru"
         }
       ],
       "productID": "myth_gear_2848",
@@ -1071,11 +806,6 @@
           "description": "Mythic rockets 49",
           "displayName": "Mythic rockets 49",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic rockets 49",
-          "displayName": "Mythic rockets 49",
-          "locale": "ru"
         }
       ],
       "productID": "myth_rocket_49",
@@ -1091,11 +821,6 @@
           "description": "Mythic rockets 50",
           "displayName": "Mythic rockets 50",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic rockets 50",
-          "displayName": "Mythic rockets 50",
-          "locale": "ru"
         }
       ],
       "productID": "myth_rocket_50",
@@ -1111,11 +836,6 @@
           "description": "Mythic rockets 51",
           "displayName": "Mythic rockets 51",
           "locale": "en_US"
-        },
-        {
-          "description": "Mythic rockets 51",
-          "displayName": "Mythic rockets 51",
-          "locale": "ru"
         }
       ],
       "productID": "myth_rocket_51",
@@ -1131,11 +851,6 @@
           "description": "Price tier 0.99 for PRICOPBUM",
           "displayName": "Price tier 0.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 0.99 for PRICOPBUM",
-          "displayName": "Price tier 0.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_99",
@@ -1151,11 +866,6 @@
           "description": "Price tier 1.99 for PRICOPBUM",
           "displayName": "Price tier 1.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 1.99 for PRICOPBUM",
-          "displayName": "Price tier 1.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_199",
@@ -1171,11 +881,6 @@
           "description": "Price tier 2.99 for PRICOPBUM",
           "displayName": "Price tier 2.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 2.99 for PRICOPBUM",
-          "displayName": "Price tier 2.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_299",
@@ -1191,11 +896,6 @@
           "description": "Price tier 3.99 for PRICOPBUM",
           "displayName": "Price tier 3.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 3.99 for PRICOPBUM",
-          "displayName": "Price tier 3.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_399",
@@ -1211,11 +911,6 @@
           "description": "Price tier 4.99 for PRICOPBUM",
           "displayName": "Price tier 4.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 4.99 for PRICOPBUM",
-          "displayName": "Price tier 4.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_499",
@@ -1231,11 +926,6 @@
           "description": "Price tier 5.99 for PRICOPBUM",
           "displayName": "Price tier 5.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 5.99 for PRICOPBUM",
-          "displayName": "Price tier 5.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_599",
@@ -1251,11 +941,6 @@
           "description": "Price tier 7.99 for PRICOPBUM",
           "displayName": "Price tier 7.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 7.99 for PRICOPBUM",
-          "displayName": "Price tier 7.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_799",
@@ -1271,11 +956,6 @@
           "description": "Price tier 9.99 for PRICOPBUM",
           "displayName": "Price tier 9.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 9.99 for PRICOPBUM",
-          "displayName": "Price tier 9.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_999",
@@ -1291,11 +971,6 @@
           "description": "Price tier 12.99 for PRICOPBUM",
           "displayName": "Price tier 12.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 12.99 for PRICOPBUM",
-          "displayName": "Price tier 12.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_1299",
@@ -1311,11 +986,6 @@
           "description": "Price tier 14.99 for PRICOPBUM",
           "displayName": "Price tier 14.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 14.99 for PRICOPBUM",
-          "displayName": "Price tier 14.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_1499",
@@ -1331,11 +1001,6 @@
           "description": "Price tier 19.99 for PRICOPBUM",
           "displayName": "Price tier 19.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 19.99 for PRICOPBUM",
-          "displayName": "Price tier 19.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_1999",
@@ -1351,11 +1016,6 @@
           "description": "Price tier 24.99 for PRICOPBUM",
           "displayName": "Price tier 24.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 24.99 for PRICOPBUM",
-          "displayName": "Price tier 24.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_2499",
@@ -1371,11 +1031,6 @@
           "description": "Price tier 29.99 for PRICOPBUM",
           "displayName": "Price tier 29.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 29.99 for PRICOPBUM",
-          "displayName": "Price tier 29.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_2999",
@@ -1391,11 +1046,6 @@
           "description": "Price tier 39.99 for PRICOPBUM",
           "displayName": "Price tier 39.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 39.99 for PRICOPBUM",
-          "displayName": "Price tier 39.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_3999",
@@ -1411,11 +1061,6 @@
           "description": "Price tier 49.99 for PRICOPBUM",
           "displayName": "Price tier 49.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 49.99 for PRICOPBUM",
-          "displayName": "Price tier 49.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_4999",
@@ -1431,11 +1076,6 @@
           "description": "Price tier 69.99 for PRICOPBUM",
           "displayName": "Price tier 69.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 69.99 for PRICOPBUM",
-          "displayName": "Price tier 69.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_6999",
@@ -1451,11 +1091,6 @@
           "description": "Price tier 99.99 for PRICOPBUM",
           "displayName": "Price tier 99.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 99.99 for PRICOPBUM",
-          "displayName": "Price tier 99.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_9999",
@@ -1471,11 +1106,6 @@
           "description": "Price tier 149.99 for PRICOPBUM",
           "displayName": "Price tier 149.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 149.99 for PRICOPBUM",
-          "displayName": "Price tier 149.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_14999",
@@ -1491,11 +1121,6 @@
           "description": "Price tier 199.99 for PRICOPBUM",
           "displayName": "Price tier 199.99",
           "locale": "en_US"
-        },
-        {
-          "description": "Price tier 199.99 for PRICOPBUM",
-          "displayName": "Price tier 199.99",
-          "locale": "ru"
         }
       ],
       "productID": "tier_19999",
